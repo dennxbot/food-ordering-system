@@ -1,6 +1,6 @@
 import { BrowserRouter } from 'react-router-dom'
 import { AppRoutes } from './router'
-import { Suspense, Component, ReactNode } from 'react'
+import { Suspense, Component, type ReactNode } from 'react'
 import TopNavigation from './components/feature/TopNavigation'
 import BottomNavigation from './components/feature/BottomNavigation'
 
@@ -48,7 +48,7 @@ const router = {
     v7_startTransition: true,
     v7_relativeSplatPath: true
   },
-  basename: __BASE_PATH__
+  basename: '/'
 };
 
 function App() {

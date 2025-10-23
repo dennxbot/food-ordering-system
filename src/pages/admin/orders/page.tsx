@@ -35,6 +35,10 @@ const AdminOrders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<string>('');
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelLoading, setCancelLoading] = useState(false);
 
   useEffect(() => {
     // Wait for auth to load before checking
@@ -100,6 +104,43 @@ const AdminOrders = () => {
     }
   };
 
+  const cancelOrderWithReason = async () => {
+    if (!cancelReason.trim()) {
+      alert('Please provide a reason for cancellation.');
+      return;
+    }
+
+    try {
+      setCancelLoading(true);
+      
+      // Call the cancel_order function with reason
+      const { error } = await supabase.rpc('cancel_order', {
+        p_order_id: selectedOrderId,
+        p_reason: cancelReason,
+        p_cancelled_by: user?.id
+      });
+
+      if (error) throw error;
+
+      // Update local state
+      setOrders(orders.map(order =>
+        order.id === selectedOrderId ? { ...order, status: 'cancelled' } : order
+      ));
+
+      // Close modal and reset state
+      setShowCancelModal(false);
+      setSelectedOrderId('');
+      setCancelReason('');
+      
+      alert('Order cancelled successfully.');
+    } catch (error: any) {
+      console.error('Error cancelling order:', error);
+      alert(error.message || 'Error cancelling order. Please try again.');
+    } finally {
+      setCancelLoading(false);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':
@@ -108,7 +149,7 @@ const AdminOrders = () => {
         return 'bg-blue-100 text-blue-800';
       case 'ready':
         return 'bg-purple-100 text-purple-800';
-      case 'out-for-delivery':
+      case 'out_for_delivery':
         return 'bg-indigo-100 text-indigo-800';
       case 'completed':
         return 'bg-green-100 text-green-800';
@@ -135,10 +176,10 @@ const AdminOrders = () => {
       case 'pending':
         return 'preparing';
       case 'preparing':
-        return orderType === 'delivery' ? 'out-for-delivery' : 'ready';
+        return orderType === 'delivery' ? 'out_for_delivery' : 'ready';
       case 'ready':
         return 'completed';
-      case 'out-for-delivery':
+      case 'out_for_delivery':
         return 'completed';
       default:
         return null;
@@ -153,7 +194,7 @@ const AdminOrders = () => {
         return orderType === 'delivery' ? 'Out for Delivery' : 'Ready for Pickup';
       case 'ready':
         return 'Mark Completed';
-      case 'out-for-delivery':
+      case 'out_for_delivery':
         return 'Mark Delivered';
       default:
         return null;
@@ -200,7 +241,7 @@ const AdminOrders = () => {
                 { key: 'pending', label: 'Pending', icon: 'ri-time-line', count: orders.filter(o => o.status === 'pending').length },
                 { key: 'preparing', label: 'Preparing', icon: 'ri-restaurant-line', count: orders.filter(o => o.status === 'preparing').length },
                 { key: 'ready', label: 'Ready', icon: 'ri-check-line', count: orders.filter(o => o.status === 'ready').length },
-                { key: 'out-for-delivery', label: 'Out for Delivery', icon: 'ri-truck-line', count: orders.filter(o => o.status === 'out-for-delivery').length },
+                { key: 'out_for_delivery', label: 'Out for Delivery', icon: 'ri-truck-line', count: orders.filter(o => o.status === 'out_for_delivery').length },
                 { key: 'completed', label: 'Completed', icon: 'ri-check-double-line', count: orders.filter(o => o.status === 'completed').length }
               ].map((tab) => (
                 <button
@@ -267,7 +308,7 @@ const AdminOrders = () => {
                             {order.status.replace('-', ' ')}
                           </span>
                           <span className="text-2xl font-bold text-orange-600">
-                            {formatCurrency(parseFloat(order.total_amount))}
+                            {formatCurrency(order.total_amount)}
                           </span>
                         </div>
                       </div>
@@ -284,7 +325,7 @@ const AdminOrders = () => {
                             {order.order_items?.map((item, index) => (
                               <div key={index} className="flex items-center justify-between text-sm">
                                 <span className="text-gray-700">{item.quantity}x {item.food_item?.name || 'Unknown Item'}</span>
-                                <span className="font-semibold text-gray-900">{formatCurrency(parseFloat(item.unit_price) * item.quantity)}</span>
+                                <span className="font-semibold text-gray-900">{formatCurrency(item.unit_price * item.quantity)}</span>
                               </div>
                             )) || <p className="text-sm text-gray-500">No items found</p>}
                           </div>
@@ -359,7 +400,10 @@ const AdminOrders = () => {
                         
                         {order.status === 'pending' && (
                           <Button
-                            onClick={() => updateOrderStatus(order.id, 'cancelled')}
+                            onClick={() => {
+                              setSelectedOrderId(order.id);
+                              setShowCancelModal(true);
+                            }}
                             className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
                           >
                             <i className="ri-close-line"></i>
@@ -375,6 +419,69 @@ const AdminOrders = () => {
           </div>
         </div>
       </div>
+
+      {/* Cancellation Modal */}
+      {showCancelModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                <i className="ri-close-circle-line text-red-600 text-xl"></i>
+              </div>
+              <h3 className="text-xl font-bold text-gray-900">Cancel Order</h3>
+            </div>
+            
+            <p className="text-gray-600 mb-4">
+              Please provide a reason for cancelling this order. This will be visible to the customer.
+            </p>
+            
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Cancellation Reason
+              </label>
+              <textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Enter reason for cancellation..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 resize-none"
+                rows={3}
+                disabled={cancelLoading}
+              />
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowCancelModal(false);
+                  setSelectedOrderId('');
+                  setCancelReason('');
+                }}
+                disabled={cancelLoading}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={cancelOrderWithReason}
+                disabled={cancelLoading || !cancelReason.trim()}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+              >
+                {cancelLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Cancelling...
+                  </>
+                ) : (
+                  <>
+                    <i className="ri-close-line"></i>
+                    Cancel Order
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

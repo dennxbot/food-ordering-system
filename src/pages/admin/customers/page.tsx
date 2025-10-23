@@ -25,7 +25,7 @@ interface CustomerOrder {
   total_amount: number;
   status: string;
   order_items: {
-    food_item: {
+    food_items: {
       name: string;
     };
     quantity: number;
@@ -118,7 +118,8 @@ const AdminCustomers = () => {
           status,
           order_items (
             quantity,
-            food_item:food_items (
+            food_item_id,
+            food_items!order_items_food_item_id_fkey (
               name
             )
           )
@@ -128,7 +129,16 @@ const AdminCustomers = () => {
 
       if (error) throw error;
 
-      setCustomerOrders(orders || []);
+      // Transform the data to match our interface
+      const transformedOrders = orders?.map(order => ({
+        ...order,
+        order_items: order.order_items?.map(item => ({
+          ...item,
+          food_items: Array.isArray(item.food_items) ? item.food_items[0] : item.food_items
+        }))
+      })) || [];
+
+      setCustomerOrders(transformedOrders);
       setShowCustomerOrders(true);
     } catch (error) {
       console.error('Error fetching customer orders:', error);
@@ -216,13 +226,13 @@ const AdminCustomers = () => {
                           <div className="space-y-1">
                             {order.order_items?.map((item, index) => (
                               <p key={index} className="text-sm text-gray-700">
-                                • {item.quantity}x {item.food_item?.name || 'Unknown Item'}
+                                • {item.quantity}x {item.food_items?.name || 'Unknown Item'}
                               </p>
                             ))}
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="font-bold text-orange-600">{formatCurrency(parseFloat(order.total_amount))}</p>
+                          <p className="font-bold text-orange-600">{formatCurrency(order.total_amount)}</p>
                           <span className={`px-2 py-1 text-xs rounded-full capitalize ${getStatusColor(order.status)}`}>
                             {order.status}
                           </span>

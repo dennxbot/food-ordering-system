@@ -12,6 +12,7 @@ interface OrderItem {
   total_price: number;
   food_items: {
     name: string;
+    image_url?: string;
   };
   item_sizes?: {
     name: string;

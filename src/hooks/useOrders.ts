@@ -218,7 +218,7 @@ export const useOrders = () => {
   // Cache for individual orders
   const orderCache = useRef<{ [key: string]: { data: OrderWithItems | null; timestamp: number } }>({});
 
-  const getOrderById = async (orderId: string) => {
+  const getOrderById = useCallback(async (orderId: string) => {
     try {
       // Check cache first
       const now = Date.now();
@@ -284,7 +284,7 @@ export const useOrders = () => {
       console.error('Error fetching order:', error);
       return null;
     }
-  };
+  }, [user]);
 
   const getTodayStats = () => {
     const today = new Date().toISOString().split('T')[0];

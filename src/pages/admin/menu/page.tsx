@@ -467,7 +467,8 @@ const AdminMenu = () => {
                         category_id: '',
                         image_url: '',
                         is_available: true,
-                        is_featured: false
+                        is_featured: false,
+                        has_sizes: false
                       });
                     }}
                     variant="outline"

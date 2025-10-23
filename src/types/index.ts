@@ -40,7 +40,7 @@ export interface Order {
   customer_address: string;
   order_type: 'delivery' | 'pickup';
   payment_method: 'cash' | 'card';
-  status: 'pending' | 'preparing' | 'out-for-delivery' | 'completed' | 'cancelled';
+  status: 'pending' | 'preparing' | 'out_for_delivery' | 'completed' | 'cancelled';
   total_amount: number;
   created_at: string;
   updated_at: string;

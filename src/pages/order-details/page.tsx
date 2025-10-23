@@ -5,6 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useOrders } from '../../hooks/useOrders';
 import { formatCurrency } from '../../utils/currency';
 import { isWithinCancellationWindow, isStatusCancellable, getCancellationTimeRemaining } from '../../utils/orderHelpers';
+import { supabase } from '../../lib/supabase';
 
 const CANCELLATION_REASONS = [
   { value: 'changed_mind', label: 'Changed my mind' },
@@ -26,8 +27,9 @@ const OrderDetails = () => {
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [showErrorToast, setShowErrorToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
-  const [order, setOrder] = useState<any | null>(null);
+  const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [cancellationInfo, setCancellationInfo] = useState<any>(null);
 
   useEffect(() => {
     // Don't do anything while auth is loading
@@ -39,6 +41,9 @@ const OrderDetails = () => {
       return;
     }
 
+    // Don't load if we already have the order data
+    if (order && order.id === id) return;
+
     const loadOrder = async () => {
       if (!id) return;
       
@@ -46,6 +51,33 @@ const OrderDetails = () => {
         setLoading(true);
         const orderData = await getOrderById(id);
         setOrder(orderData);
+        
+        // If order is cancelled, fetch cancellation info
+        if (orderData?.status === 'cancelled') {
+          try {
+            // Set user context for RLS before querying cancellation data
+            if (user) {
+              await supabase.rpc('set_user_context', { 
+                user_id: user.id, 
+                user_role: user.role 
+              });
+            }
+            
+            const { data: cancellationData, error: cancellationError } = await supabase
+              .from('order_cancellations')
+              .select('reason, created_at, cancelled_by')
+              .eq('order_id', id)
+              .single();
+              
+            if (!cancellationError && cancellationData) {
+              setCancellationInfo(cancellationData);
+            } else if (cancellationError) {
+              console.warn('Could not fetch cancellation info:', cancellationError);
+            }
+          } catch (cancellationFetchError) {
+            console.warn('Error fetching cancellation info:', cancellationFetchError);
+          }
+        }
       } catch (error) {
         console.error('Error loading order:', error);
         setOrder(null);
@@ -55,7 +87,7 @@ const OrderDetails = () => {
     };
 
     loadOrder();
-  }, [id, user, authLoading, navigate, getOrderById]);
+  }, [id, user?.id, authLoading, navigate, getOrderById, order]);
 
   const getStatusSteps = () => {
     const steps = [
@@ -201,6 +233,27 @@ const OrderDetails = () => {
         {/* Status Timeline */}
             <div className="bg-white rounded-2xl shadow-lg p-6 border border-orange-100">
               <h3 className="text-lg font-bold text-gray-900 mb-6">Order Status</h3>
+              
+              {/* Cancellation Notice */}
+              {order.status === 'cancelled' && cancellationInfo && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <i className="ri-close-circle-line text-red-600"></i>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-red-900 mb-1">Order Cancelled</h4>
+                      <p className="text-red-800 text-sm mb-2">
+                        <strong>Reason:</strong> {cancellationInfo.reason}
+                      </p>
+                      <p className="text-red-700 text-xs">
+                        Cancelled on {new Date(cancellationInfo.created_at).toLocaleDateString()} at {new Date(cancellationInfo.created_at).toLocaleTimeString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               <div className="space-y-6">
                 {statusSteps.map((step) => (
               <div key={step.key} className="flex items-center">
