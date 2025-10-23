@@ -53,7 +53,7 @@ const Profile = () => {
       console.error('Error updating profile:', error);
       alert('Failed to update profile. Please try again.');
     } finally {
-      setIsLoading(false);
+      setIsSaving(false);
     }
   };
 
@@ -178,16 +178,16 @@ const Profile = () => {
                 <div className="mt-6 flex flex-col sm:flex-row gap-3">
                   <Button
                     onClick={handleSave}
-                    disabled={isLoading}
+                    disabled={isSaving}
                     className="flex-1 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white py-3 rounded-lg font-semibold whitespace-nowrap shadow-lg disabled:opacity-50"
                   >
-                    <i className={`${isLoading ? 'ri-loader-4-line animate-spin' : 'ri-save-line'} mr-2`}></i>
-                    {isLoading ? 'Saving...' : 'Save Changes'}
+                    <i className={`${isSaving ? 'ri-loader-4-line animate-spin' : 'ri-save-line'} mr-2`}></i>
+                    {isSaving ? 'Saving...' : 'Save Changes'}
                   </Button>
                   <Button
                     onClick={() => setIsEditing(false)}
                     variant="outline"
-                    disabled={isLoading}
+                    disabled={isSaving}
                     className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50 py-3 rounded-lg font-semibold whitespace-nowrap disabled:opacity-50"
                   >
                     Cancel
