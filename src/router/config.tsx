@@ -1,5 +1,6 @@
-import type { RouteObject } from 'react-router-dom';
+import { type RouteObject } from 'react-router-dom';
 import { lazy } from 'react';
+import ProtectedRoute from '../components/feature/ProtectedRoute';
 
 // Error component for lazy loading failures
 const ErrorComponent = () => (
@@ -62,6 +63,11 @@ const AdminReports = lazyLoad(() => import('../pages/admin/reports/page'));
 const AdminSettings = lazyLoad(() => import('../pages/admin/settings/page'));
 const AdminPOS = lazyLoad(() => import('../pages/admin/pos/page'));
 const AdminPOSSales = lazyLoad(() => import('../pages/admin/pos/sales/page'));
+// Kiosk pages
+const KioskDashboard = lazyLoad(() => import('../pages/kiosk/dashboard/page'));
+const KioskMenu = lazyLoad(() => import('../pages/kiosk/menu/page'));
+const KioskCart = lazyLoad(() => import('../pages/kiosk/cart/page'));
+const KioskOrderSuccess = lazyLoad(() => import('../pages/kiosk/order-success/page'));
 
 const routes: RouteObject[] = [
   {
@@ -108,37 +114,102 @@ const routes: RouteObject[] = [
     path: '/profile',
     element: <Profile />,
   },
+  // Kiosk routes
+  {
+    path: '/kiosk',
+    element: (
+      <ProtectedRoute requiredRole="kiosk">
+        <KioskDashboard />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/kiosk/menu',
+    element: (
+      <ProtectedRoute requiredRole="kiosk">
+        <KioskMenu />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/kiosk/cart',
+    element: (
+      <ProtectedRoute requiredRole="kiosk">
+        <KioskCart />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/kiosk/order-success',
+    element: (
+      <ProtectedRoute requiredRole="kiosk">
+        <KioskOrderSuccess />
+      </ProtectedRoute>
+    ),
+  },
   {
     path: '/admin',
-    element: <AdminDashboard />,
+    element: (
+      <ProtectedRoute requiredRole="admin">
+        <AdminDashboard />
+      </ProtectedRoute>
+    ),
   },
   {
     path: '/admin/menu',
-    element: <AdminMenu />,
+    element: (
+      <ProtectedRoute requiredRole="admin">
+        <AdminMenu />
+      </ProtectedRoute>
+    ),
   },
   {
     path: '/admin/orders',
-    element: <AdminOrders />,
+    element: (
+      <ProtectedRoute requiredRole="admin">
+        <AdminOrders />
+      </ProtectedRoute>
+    ),
   },
   {
     path: '/admin/customers',
-    element: <AdminCustomers />,
+    element: (
+      <ProtectedRoute requiredRole="admin">
+        <AdminCustomers />
+      </ProtectedRoute>
+    ),
   },
   {
     path: '/admin/reports',
-    element: <AdminReports />,
+    element: (
+      <ProtectedRoute requiredRole="admin">
+        <AdminReports />
+      </ProtectedRoute>
+    ),
   },
   {
     path: '/admin/settings',
-    element: <AdminSettings />,
+    element: (
+      <ProtectedRoute requiredRole="admin">
+        <AdminSettings />
+      </ProtectedRoute>
+    ),
   },
   {
     path: '/admin/pos',
-    element: <AdminPOS />,
+    element: (
+      <ProtectedRoute requiredRole="admin">
+        <AdminPOS />
+      </ProtectedRoute>
+    ),
   },
   {
     path: '/admin/pos/sales',
-    element: <AdminPOSSales />,
+    element: (
+      <ProtectedRoute requiredRole="admin">
+        <AdminPOSSales />
+      </ProtectedRoute>
+    ),
   },
   {
     path: '*',

@@ -48,7 +48,7 @@ export type Database = {
           full_name: string;
           contact_number: string | null;
           address: string | null;
-          role: 'customer' | 'admin';
+          role: 'customer' | 'admin' | 'kiosk';
           created_at: string;
           updated_at: string;
         };
@@ -58,7 +58,7 @@ export type Database = {
           full_name: string;
           contact_number?: string | null;
           address?: string | null;
-          role?: 'customer' | 'admin';
+          role?: 'customer' | 'admin' | 'kiosk';
           created_at?: string;
           updated_at?: string;
         };
@@ -68,7 +68,7 @@ export type Database = {
           full_name?: string;
           contact_number?: string | null;
           address?: string | null;
-          role?: 'customer' | 'admin';
+          role?: 'customer' | 'admin' | 'kiosk';
           created_at?: string;
           updated_at?: string;
         };

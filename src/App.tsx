@@ -1,8 +1,10 @@
 import { BrowserRouter } from 'react-router-dom'
 import { AppRoutes } from './router'
 import { Suspense, Component, type ReactNode } from 'react'
+import { useAuth } from './hooks/useAuth'
 import TopNavigation from './components/feature/TopNavigation'
 import BottomNavigation from './components/feature/BottomNavigation'
+import KioskNavigation from './components/feature/KioskNavigation'
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   constructor(props: { children: ReactNode }) {
@@ -51,22 +53,41 @@ const router = {
   basename: '/'
 };
 
+function AppContent() {
+  const { isKiosk } = useAuth();
+
+  return (
+    <ErrorBoundary>
+      <Suspense fallback={
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-orange-500"></div>
+        </div>
+      }>
+        {isKiosk ? (
+          <>
+            <KioskNavigation />
+            <div className="pt-20">
+              <AppRoutes />
+            </div>
+          </>
+        ) : (
+          <>
+            <TopNavigation />
+            <div className="lg:pt-20">
+              <AppRoutes />
+            </div>
+            <BottomNavigation />
+          </>
+        )}
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
+
 function App() {
   return (
     <BrowserRouter {...router}>
-      <ErrorBoundary>
-        <Suspense fallback={
-          <div className="flex items-center justify-center min-h-screen">
-            <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-orange-500"></div>
-          </div>
-        }>
-          <TopNavigation />
-          <div className="lg:pt-20">
-            <AppRoutes />
-          </div>
-          <BottomNavigation />
-        </Suspense>
-      </ErrorBoundary>
+      <AppContent />
     </BrowserRouter>
   )
 }

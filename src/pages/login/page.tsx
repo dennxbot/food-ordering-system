@@ -104,6 +104,8 @@ export default function Login() {
         // Redirect based on user role
         if (result.user.role === 'admin') {
           navigate('/admin');
+        } else if (result.user.role === 'kiosk') {
+          navigate('/kiosk');
         } else {
           navigate('/');
         }

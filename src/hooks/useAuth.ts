@@ -8,7 +8,7 @@ interface UserProfile {
   full_name: string;
   contact_number: string | null;
   address: string | null;
-  role: 'customer' | 'admin';
+  role: 'customer' | 'admin' | 'kiosk';
   password: string;
 }
 
@@ -70,7 +70,7 @@ export const useAuth = () => {
     fullName: string;
     contactNumber?: string;
     address?: string;
-    role?: 'customer' | 'admin';
+    role?: 'customer' | 'admin' | 'kiosk';
   }): Promise<{ success: boolean; error?: string }> => {
     try {
       setIsLoading(true);
@@ -229,5 +229,6 @@ export const useAuth = () => {
     changePassword,
     isAuthenticated: !!user,
     isAdmin: user?.role === 'admin',
+    isKiosk: user?.role === 'kiosk',
   };
 };
