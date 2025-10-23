@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useCart } from '../context/CartContext';
+import { formatCurrency } from '../utils/currency';
 import { apiService } from '../services/api';
 import { printService } from '../services/printService';
 import CartItemCard from '../components/CartItemCard';
@@ -34,7 +35,7 @@ const CartScreen: React.FC<CartScreenProps> = ({ navigation }) => {
   const [customerPhone, setCustomerPhone] = useState('');
 
   const formatPrice = (price: number): string => {
-    return `$${price.toFixed(2)}`;
+    return formatCurrency(price);
   };
 
   const calculateTax = (subtotal: number): number => {

@@ -19,11 +19,16 @@ interface Order {
   total_amount: number;
   notes: string;
   created_at: string;
+  order_source?: string;
   order_items: {
     id: string;
     quantity: number;
     unit_price: number;
+    size_id?: string;
     food_item: {
+      name: string;
+    };
+    item_sizes?: {
       name: string;
     };
   }[];
@@ -34,6 +39,7 @@ const AdminOrders = () => {
   const { user, isLoading, isAuthenticated, isAdmin } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [filter, setFilter] = useState('all');
+  const [sourceFilter, setSourceFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string>('');
@@ -51,13 +57,13 @@ const AdminOrders = () => {
     }
 
     fetchOrders();
-  }, [isAuthenticated, isAdmin, isLoading, navigate]);
+  }, [isAuthenticated, isAdmin, isLoading, navigate, sourceFilter]);
 
   const fetchOrders = async () => {
     try {
       setLoading(true);
 
-      const { data: ordersData, error } = await supabase
+      let query = supabase
         .from('orders')
         .select(`
           *,
@@ -65,12 +71,23 @@ const AdminOrders = () => {
             id,
             quantity,
             unit_price,
+            size_id,
             food_item:food_items (
+              name
+            ),
+            item_sizes (
               name
             )
           )
         `)
         .order('created_at', { ascending: false });
+
+      // Apply source filter if not 'all'
+      if (sourceFilter !== 'all') {
+        query = query.eq('order_source', sourceFilter);
+      }
+
+      const { data: ordersData, error } = await query;
 
       if (error) throw error;
 
@@ -186,10 +203,11 @@ const AdminOrders = () => {
     }
   };
 
-  const getNextStatusLabel = (currentStatus: string, orderType: string) => {
+  const getNextStatusLabel = (currentStatus: string, orderType: string, orderSource?: string) => {
     switch (currentStatus) {
       case 'pending':
-        return 'Start Preparing';
+        // For kiosk orders, show "Approve" instead of "Start Preparing"
+        return orderSource === 'kiosk' ? 'Approve' : 'Start Preparing';
       case 'preparing':
         return orderType === 'delivery' ? 'Out for Delivery' : 'Ready for Pickup';
       case 'ready':
@@ -233,8 +251,35 @@ const AdminOrders = () => {
         </div>
 
         <div className="p-6">
-          {/* Filter Tabs */}
+          {/* Order Source Filter Tabs */}
+          <div className="bg-white rounded-2xl shadow-sm p-6 mb-6 border border-gray-100">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Source</h3>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { key: 'all', label: 'All Sources', icon: 'ri-global-line' },
+                { key: 'online', label: 'Online Orders', icon: 'ri-computer-line' },
+                { key: 'kiosk', label: 'Kiosk Orders', icon: 'ri-store-2-line' },
+                { key: 'pos', label: 'POS Orders', icon: 'ri-cash-line' }
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setSourceFilter(tab.key)}
+                  className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 flex items-center gap-2 ${
+                    sourceFilter === tab.key
+                      ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                  }`}
+                >
+                  <i className={tab.icon}></i>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Status Filter Tabs */}
           <div className="bg-white rounded-2xl shadow-sm p-6 mb-8 border border-gray-100">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Status</h3>
             <div className="flex flex-wrap gap-2">
               {[
                 { key: 'all', label: 'All Orders', icon: 'ri-list-check', count: orders.length },
@@ -295,7 +340,22 @@ const AdminOrders = () => {
                             <i className="ri-shopping-bag-line text-xl text-white"></i>
                           </div>
                           <div>
-                            <h3 className="text-xl font-bold text-gray-900">Order #{order.id.slice(-8)}</h3>
+                            <div className="flex items-center gap-3 mb-1">
+                              <h3 className="text-xl font-bold text-gray-900">Order #{order.id.slice(-8)}</h3>
+                              {/* Order Source Badge */}
+                              <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
+                                order.order_source === 'kiosk' 
+                                  ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                                  : order.order_source === 'pos'
+                                  ? 'bg-green-100 text-green-700 border border-green-200'
+                                  : 'bg-blue-100 text-blue-700 border border-blue-200'
+                              }`}>
+                                {order.order_source === 'kiosk' && <i className="ri-store-2-line mr-1"></i>}
+                                {order.order_source === 'pos' && <i className="ri-cash-line mr-1"></i>}
+                                {order.order_source === 'online' && <i className="ri-computer-line mr-1"></i>}
+                                {order.order_source || 'online'}
+                              </span>
+                            </div>
                             <p className="text-sm text-gray-600 flex items-center gap-2">
                               <i className="ri-user-line"></i>
                               {order.customer_name} • {getTimeAgo(order.created_at)}
@@ -324,7 +384,12 @@ const AdminOrders = () => {
                           <div className="space-y-2">
                             {order.order_items?.map((item, index) => (
                               <div key={index} className="flex items-center justify-between text-sm">
-                                <span className="text-gray-700">{item.quantity}x {item.food_item?.name || 'Unknown Item'}</span>
+                                <span className="text-gray-700">
+                                  {item.quantity}x {item.food_item?.name || 'Unknown Item'}
+                                  {item.item_sizes?.name && (
+                                    <span className="text-gray-500 ml-1">({item.item_sizes.name})</span>
+                                  )}
+                                </span>
                                 <span className="font-semibold text-gray-900">{formatCurrency(item.unit_price * item.quantity)}</span>
                               </div>
                             )) || <p className="text-sm text-gray-500">No items found</p>}
@@ -362,18 +427,27 @@ const AdminOrders = () => {
                             Order Details
                           </h4>
                           <div className="space-y-2 text-sm">
-                            <div className="flex items-center gap-2">
-                              <i className="ri-truck-line text-gray-400"></i>
-                              <span className="text-gray-700 capitalize">{order.order_type || 'pickup'}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <i className="ri-bank-card-line text-gray-400"></i>
-                              <span className="text-gray-700 capitalize">
-                                {order.payment_method === 'cash' ?
-                                  (order.order_type === 'delivery' ? 'Cash on Delivery' : 'Pay on Pickup') :
-                                  order.payment_method || 'Cash'}
-                              </span>
-                            </div>
+                            {order.order_source === 'kiosk' ? (
+                              <div className="flex items-center gap-2">
+                                <i className="ri-store-2-line text-gray-400"></i>
+                                <span className="text-gray-700">Kiosk Order</span>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="flex items-center gap-2">
+                                  <i className="ri-truck-line text-gray-400"></i>
+                                  <span className="text-gray-700 capitalize">{order.order_type || 'pickup'}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <i className="ri-bank-card-line text-gray-400"></i>
+                                  <span className="text-gray-700 capitalize">
+                                    {order.payment_method === 'cash' ?
+                                      (order.order_type === 'delivery' ? 'Cash on Delivery' : 'Pay on Pickup') :
+                                      order.payment_method || 'Cash'}
+                                  </span>
+                                </div>
+                              </>
+                            )}
                             {order.notes && (
                               <div className="flex items-start gap-2">
                                 <i className="ri-sticky-note-line text-gray-400 mt-0.5"></i>
@@ -394,7 +468,7 @@ const AdminOrders = () => {
                             className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
                           >
                             <i className="ri-arrow-right-line"></i>
-                            {getNextStatusLabel(order.status, order.order_type)}
+                            {getNextStatusLabel(order.status, order.order_type, order.order_source)}
                           </Button>
                         )}
                         
@@ -407,7 +481,7 @@ const AdminOrders = () => {
                             className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
                           >
                             <i className="ri-close-line"></i>
-                            Cancel Order
+                            {order.order_source === 'kiosk' ? 'Cancel' : 'Cancel Order'}
                           </Button>
                         )}
                       </div>
@@ -431,9 +505,19 @@ const AdminOrders = () => {
               <h3 className="text-xl font-bold text-gray-900">Cancel Order</h3>
             </div>
             
-            <p className="text-gray-600 mb-4">
-              Please provide a reason for cancelling this order. This will be visible to the customer.
-            </p>
+            {(() => {
+              const selectedOrder = orders.find(order => order.id === selectedOrderId);
+              const isKioskOrder = selectedOrder?.order_source === 'kiosk';
+              
+              return (
+                <p className="text-gray-600 mb-4">
+                  {isKioskOrder 
+                    ? "Please provide a reason for cancelling this kiosk order. Common reasons include no payment received or order placed by mistake."
+                    : "Please provide a reason for cancelling this order. This will be visible to the customer."
+                  }
+                </p>
+              );
+            })()}
             
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -442,7 +526,13 @@ const AdminOrders = () => {
               <textarea
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
-                placeholder="Enter reason for cancellation..."
+                placeholder={(() => {
+                  const selectedOrder = orders.find(order => order.id === selectedOrderId);
+                  const isKioskOrder = selectedOrder?.order_source === 'kiosk';
+                  return isKioskOrder 
+                    ? "e.g., No payment received, Order placed by mistake..."
+                    : "Enter reason for cancellation...";
+                })()}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 resize-none"
                 rows={3}
                 disabled={cancelLoading}

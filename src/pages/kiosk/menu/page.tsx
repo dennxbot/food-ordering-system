@@ -1,38 +1,77 @@
-import { useState } from 'react';
-import { useAuth } from '../../../hooks/useAuth';
-import { useCart } from '../../../hooks/useCart';
+import { useState, useEffect } from 'react';
 import { useFoodItems } from '../../../hooks/useFoodItems';
-import { Navigate } from 'react-router-dom';
-import { type FoodItem } from '../../../types';
+import { useCart } from '../../../hooks/useCart';
+import { useItemSizes } from '../../../hooks/useItemSizes';
+import { formatCurrency } from '../../../utils/currency';
 
-// Define a local Category interface that matches what useFoodItems returns
-interface LocalCategory {
+interface FoodItem {
   id: string;
   name: string;
   description: string | null;
+  price: number;
   image_url: string | null;
-  is_active: boolean;
-  created_at: string;
+  category_id: string | null;
+  is_available: boolean;
+  is_featured: boolean;
+  preparation_time: number;
+  has_sizes?: boolean;
+  category?: {
+    name: string;
+  };
 }
 
-const KioskMenuPage = () => {
-  const { user, isAuthenticated } = useAuth();
-  const { cart, addToCart } = useCart();
-  const { foodItems, categories, isLoading } = useFoodItems();
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+interface LocalCategory {
+  id: string;
+  name: string;
+}
 
-  // Redirect if not authenticated or not a kiosk user
-  if (!isAuthenticated || user?.role !== 'kiosk') {
-    return <Navigate to="/login" replace />;
-  }
+interface Size {
+  id: string;
+  name: string;
+  price: number;
+}
+
+const KioskMenuPage: React.FC = () => {
+  const { foodItems, categories, isLoading } = useFoodItems();
+  const { addToCart, cart } = useCart();
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [showSizeModal, setShowSizeModal] = useState(false);
+  const [selectedItemForSize, setSelectedItemForSize] = useState<FoodItem | null>(null);
+  const { sizes: itemSizes } = useItemSizes(selectedItemForSize?.id);
 
   const filteredItems = selectedCategory === 'All' 
     ? foodItems 
     : foodItems.filter((item: FoodItem) => item.category?.name === selectedCategory);
 
   const handleAddToCart = async (item: FoodItem) => {
+    // Check if item has sizes and show modal
+    if (item.has_sizes) {
+      setSelectedItemForSize(item);
+      setShowSizeModal(true);
+      return;
+    }
+
+    // Add item without size
     try {
-      await addToCart(item, 1);
+      await addToCart({ ...item, has_sizes: item.has_sizes || false }, 1);
+      // Optional: Show success feedback
+    } catch (error) {
+      console.error('Failed to add item to cart:', error);
+      alert('Failed to add item to cart. Please try again.');
+    }
+  };
+
+  const addItemWithSize = async (item: FoodItem, selectedSize?: Size) => {
+    try {
+      await addToCart(
+        { ...item, has_sizes: item.has_sizes || false },
+        1,
+        selectedSize?.id || null,
+        selectedSize?.name || null,
+        selectedSize?.price || null
+      );
+      setShowSizeModal(false);
+      setSelectedItemForSize(null);
       // Optional: Show success feedback
     } catch (error) {
       console.error('Failed to add item to cart:', error);
@@ -126,7 +165,7 @@ const KioskMenuPage = () => {
                 
                 <div className="flex items-center justify-between">
                   <span className="text-2xl font-bold text-green-600">
-                    ${item.price.toFixed(2)}
+                    {formatCurrency(item.price)}
                   </span>
                   
                   <button
@@ -153,6 +192,68 @@ const KioskMenuPage = () => {
           </div>
         )}
       </div>
+
+      {/* Size Selection Modal */}
+      {showSizeModal && selectedItemForSize && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-3xl p-8 max-w-lg w-full mx-4 shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-bold text-gray-900">Choose Size</h3>
+              <button 
+                onClick={() => {
+                  setShowSizeModal(false);
+                  setSelectedItemForSize(null);
+                }}
+                className="text-gray-500 hover:text-gray-700 p-2"
+              >
+                <i className="ri-close-line text-2xl"></i>
+              </button>
+            </div>
+
+            <div className="mb-6">
+              <h4 className="text-lg font-semibold text-gray-800 mb-2">{selectedItemForSize.name}</h4>
+              <p className="text-gray-600">{selectedItemForSize.description}</p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 mb-6">
+              {/* Regular size option */}
+              <button
+                onClick={() => addItemWithSize(selectedItemForSize)}
+                className="p-6 rounded-2xl border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all duration-300 text-left"
+              >
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-xl font-semibold text-gray-900">Regular</p>
+                    <p className="text-gray-600 mt-1">Standard size</p>
+                  </div>
+                  <p className="text-xl font-bold text-blue-600">
+                    {formatCurrency(selectedItemForSize.price)}
+                  </p>
+                </div>
+              </button>
+
+              {/* Available sizes */}
+              {itemSizes?.map((size: Size) => (
+                <button
+                  key={size.id}
+                  onClick={() => addItemWithSize(selectedItemForSize, size)}
+                  className="p-6 rounded-2xl border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all duration-300 text-left"
+                >
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-xl font-semibold text-gray-900">{size.name}</p>
+                      <p className="text-gray-600 mt-1">{size.name} size</p>
+                    </div>
+                    <p className="text-xl font-bold text-blue-600">
+                      {formatCurrency(selectedItemForSize.price + size.price)}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

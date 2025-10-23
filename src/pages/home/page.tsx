@@ -93,6 +93,24 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-red-50 pb-20 lg:pb-8">
+      {/* Top Navigation Bar */}
+      <div className="bg-white/90 backdrop-blur-sm shadow-sm border-b border-gray-100 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center">
+              <h2 className="text-xl font-bold text-gray-900">Food Ordering System</h2>
+            </div>
+            <button
+              onClick={() => navigate('/access-selection')}
+              className="text-sm text-gray-600 hover:text-orange-600 transition-colors duration-200 flex items-center gap-2"
+            >
+              <i className="ri-apps-line"></i>
+              Access Selection
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Hero Section */}
       <div 
         className="relative min-h-[70vh] flex items-center justify-center bg-cover bg-center bg-no-repeat"

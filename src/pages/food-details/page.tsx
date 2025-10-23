@@ -59,13 +59,14 @@ export default function FoodDetails() {
     };
     
     try {
-      // Check if item already exists in cart
+      // Check if this exact item with this exact size already exists in cart
       const existingItem = items.find((i: CartItem) => 
         i.id === item.id && i.size_id === (selectedSize?.id || null)
       );
 
       if (existingItem) {
-        alert('This item is already in your cart. You can update the quantity in the cart.');
+        const sizeText = selectedSize ? ` (${selectedSize.name})` : '';
+        alert(`This item${sizeText} is already in your cart. You can update the quantity in the cart.`);
         return;
       }
 

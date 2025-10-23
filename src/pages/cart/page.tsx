@@ -133,7 +133,7 @@ export default function Cart() {
           <div className="lg:col-span-2">
             <div className="space-y-4 lg:space-y-6 mb-8 lg:mb-0">
               {cartItems.map((item, index) => (
-                <div key={item.id} className="bg-white rounded-2xl lg:rounded-3xl p-4 lg:p-6 shadow-lg border border-orange-100 hover:shadow-xl transition-shadow duration-300">
+                <div key={`${item.id}-${item.size_id || 'no-size'}`} className="bg-white rounded-2xl lg:rounded-3xl p-4 lg:p-6 shadow-lg border border-orange-100 hover:shadow-xl transition-shadow duration-300">
                   <div className="flex gap-4">
                     <div className="relative flex-shrink-0">
                       <img

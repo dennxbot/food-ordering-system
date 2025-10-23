@@ -48,6 +48,17 @@ export const useAuth = () => {
         };
       }
 
+      // Check if kiosk user is trying to login from unauthorized URL
+      if (data.role === 'kiosk') {
+        const currentPath = window.location.pathname;
+        if (currentPath !== '/kiosk-login') {
+          return {
+            success: false,
+            error: 'Kiosk accounts can only be accessed from the kiosk login page. Please use the designated kiosk terminal.'
+          };
+        }
+      }
+
       // Store user in localStorage and state
       localStorage.setItem('currentUser', JSON.stringify(data));
       setUser(data);

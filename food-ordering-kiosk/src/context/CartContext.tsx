@@ -27,8 +27,8 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 const calculateItemPrice = (foodItem: FoodItem, size?: ItemSize): number => {
   const basePrice = foodItem.price;
-  const sizeModifier = size?.price_modifier || 0;
-  return basePrice + sizeModifier;
+  const sizePrice = size?.price_modifier || 0;
+  return basePrice + sizePrice;
 };
 
 const generateCartItemId = (foodItem: FoodItem, size?: ItemSize): string => {

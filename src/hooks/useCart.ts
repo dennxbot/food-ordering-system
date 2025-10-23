@@ -329,81 +329,85 @@ export const useCart = () => {
       return;
     }
 
-    // Optimistic update
-    const newItem: CartItem = {
-      ...item,
-      quantity,
-      size_id: sizeId,
-      size_name: sizeName,
-      size_price: sizePrice
-    };
+    try {
+      // First, check if item already exists with this size
+      let existingQuery = supabase
+        .from('cart_items')
+        .select('quantity')
+        .eq('user_id', user.id)
+        .eq('food_item_id', item.id);
 
-    const existingItemIndex = items.findIndex(
-      cartItem => cartItem.id === item.id && cartItem.size_id === sizeId
-    );
+      if (sizeId === null) {
+        existingQuery = existingQuery.is('size_id', null);
+      } else {
+        existingQuery = existingQuery.eq('size_id', sizeId);
+      }
 
-    const optimisticItems = existingItemIndex >= 0
-      ? items.map((cartItem, index) =>
-          index === existingItemIndex
-            ? { ...cartItem, quantity: cartItem.quantity + quantity }
-            : cartItem
-        )
-      : [...items, newItem];
-
-      // Update cache and state immediately
-      cartCache.current[user.id] = optimisticItems;
+      const { data: existingItems, error: selectError } = await existingQuery;
       
-      // Use state update callback to ensure state is updated
-      await new Promise<void>(resolve => {
-        setItems(optimisticItems);
-        // Wait for next render to ensure state is updated
-        setTimeout(resolve, 0);
-      });
+      if (selectError) throw selectError;
 
-      try {
-        // Try to insert first
+      if (existingItems && existingItems.length > 0) {
+        // Update existing item quantity
+        const newQuantity = existingItems[0].quantity + quantity;
+        
+        let updateQuery = supabase
+          .from('cart_items')
+          .update({ quantity: newQuantity })
+          .eq('user_id', user.id)
+          .eq('food_item_id', item.id);
+
+        if (sizeId === null) {
+          updateQuery = updateQuery.is('size_id', null);
+        } else {
+          updateQuery = updateQuery.eq('size_id', sizeId);
+        }
+
+        const { error: updateError } = await updateQuery;
+        if (updateError) throw updateError;
+      } else {
+        // Insert new item
         const { error: insertError } = await supabase
           .from('cart_items')
           .insert({
             user_id: user.id,
             food_item_id: item.id,
             quantity: quantity,
-            size_id: sizeId,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
-          .select()
-          .single();
+            size_id: sizeId
+          });
 
-        // If we get a unique constraint error, it means the item exists
-        if (insertError && insertError.code === '23505') {
-          // Update the quantity of the existing item
-          const { error: updateError } = await supabase
-            .from('cart_items')
-            .update({ 
-              // Use a direct number addition since we can't use raw SQL
-              quantity: quantity,
-              updated_at: new Date().toISOString()
-            })
-            .eq('user_id', user.id)
-            .eq('food_item_id', item.id)
-            .is('size_id', sizeId === null ? null : sizeId);
+        if (insertError) throw insertError;
+      }
 
-          if (updateError) throw updateError;
-        } else if (insertError) {
-          // If it's any other error, throw it
-          throw insertError;
-        }
+      // Update optimistic state after successful database operation
+      const newItem: CartItem = {
+        ...item,
+        quantity,
+        size_id: sizeId,
+        size_name: sizeName,
+        size_price: sizePrice
+      };
 
-        return true; // Operation succeeded
-      } catch (error: any) {
-        console.error('❌ Error adding to cart:', error);
-        // Revert optimistic update on error
-        const revertedItems = cartCache.current[user.id] || items;
-        setItems(revertedItems);
-        
-        // Throw the error to be handled by the caller
-        throw error;
+      const existingItemIndex = items.findIndex(
+        cartItem => cartItem.id === item.id && cartItem.size_id === sizeId
+      );
+
+      const optimisticItems = existingItemIndex >= 0
+        ? items.map((cartItem, index) =>
+            index === existingItemIndex
+              ? { ...cartItem, quantity: cartItem.quantity + quantity }
+              : cartItem
+          )
+        : [...items, newItem];
+
+      // Update cache and state
+      cartCache.current[user.id] = optimisticItems;
+      setItems(optimisticItems);
+
+      return true; // Operation succeeded
+    } catch (error: any) {
+      console.error('❌ Error adding to cart:', error);
+      throw error;
     }
   };
 
@@ -597,6 +601,7 @@ export const useCart = () => {
     orderType: 'delivery' | 'pickup';
     paymentMethod: 'cash' | 'card';
     userId: string;
+    orderSource?: 'online' | 'kiosk' | 'pos';
   }) => {
     try {
       // Start a Supabase transaction
@@ -610,6 +615,7 @@ export const useCart = () => {
           p_order_type: orderData.orderType,
           p_payment_method: orderData.paymentMethod,
           p_total_amount: getTotalPrice(),
+          p_order_source: orderData.orderSource || 'online',
           p_order_items: items.map(item => ({
             food_item_id: item.id,
             size_id: item.size_id,

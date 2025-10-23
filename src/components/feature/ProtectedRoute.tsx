@@ -28,6 +28,20 @@ const ProtectedRoute = ({
       return;
     }
 
+    // Special handling for kiosk users - restrict to kiosk routes only
+    if (isKiosk) {
+      const currentPath = window.location.pathname;
+      const allowedKioskPaths = ['/kiosk', '/kiosk/', '/kiosk-login'];
+      const isKioskPath = allowedKioskPaths.some(path => 
+        currentPath === path || currentPath.startsWith('/kiosk/')
+      );
+      
+      if (!isKioskPath) {
+        navigate('/kiosk');
+        return;
+      }
+    }
+
     // Check role-based access
     if (requiredRole) {
       const hasRequiredRole = 

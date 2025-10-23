@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CartItem } from '../types';
+import { formatCurrency } from '../utils/currency';
 import TouchButton from './TouchButton';
 
 interface CartItemCardProps {
@@ -29,7 +30,7 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
   const [notesText, setNotesText] = useState(item.notes || '');
 
   const formatPrice = (price: number): string => {
-    return `$${price.toFixed(2)}`;
+    return formatCurrency(price);
   };
 
   const handleQuantityChange = (change: number) => {

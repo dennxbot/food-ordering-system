@@ -48,6 +48,7 @@ export interface Order {
   payment_method: 'cash' | 'card';
   status: 'pending' | 'preparing' | 'out_for_delivery' | 'completed' | 'cancelled';
   total_amount: number;
+  order_source?: 'web' | 'kiosk' | 'pos';
   created_at: string;
   updated_at: string;
 }

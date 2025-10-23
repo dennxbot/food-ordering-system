@@ -1,6 +1,7 @@
 import * as Print from 'expo-print';
 import { shareAsync } from 'expo-sharing';
 import { CartItem, Order, PrintReceipt } from '../types';
+import { formatCurrency } from '../utils/currency';
 
 class PrintService {
   private kioskLocation: string = 'Kiosk Terminal 1';
@@ -12,7 +13,7 @@ class PrintService {
   }
 
   private formatCurrency(amount: number): string {
-    return `$${amount.toFixed(2)}`;
+    return formatCurrency(amount);
   }
 
   private formatDateTime(date: Date): string {

@@ -2,17 +2,13 @@ import { useState } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
 import { useCart } from '../../../hooks/useCart';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { formatCurrency } from '../../../utils/currency';
 
 const KioskCartPage: React.FC = () => {
-  const { user, isAuthenticated } = useAuth();
+  const { user } = useAuth();
   const { cart, updateQuantity, removeFromCart, clearCart, getCartTotal, createOrder } = useCart();
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
-
-  // Redirect if not authenticated or not a kiosk user
-  if (!isAuthenticated || user?.role !== 'kiosk') {
-    return <Navigate to="/login" replace />;
-  }
 
   const handleQuantityChange = (itemId: string, newQuantity: number) => {
     if (newQuantity <= 0) {
@@ -34,12 +30,13 @@ const KioskCartPage: React.FC = () => {
         customerAddress: 'Kiosk Order - In Store',
         orderType: 'pickup' as const,
         paymentMethod: 'cash' as const,
-        userId: user?.id || ''
+        userId: user?.id || '',
+        orderSource: 'kiosk' as const
       };
 
-      await createOrder(orderData);
+      const order = await createOrder(orderData);
       clearCart();
-      navigate('/kiosk/order-success');
+      navigate('/kiosk/order-success', { state: { orderId: order.id } });
     } catch (error) {
       console.error('Failed to place order:', error);
       alert('Failed to place order. Please try again.');
@@ -114,7 +111,17 @@ const KioskCartPage: React.FC = () => {
                         {item.name}
                       </h3>
                       <p className="text-lg text-green-600 font-medium">
-                        ${item.price.toFixed(2)} each
+                        {item.size_name ? (
+                          <>
+                            {formatCurrency(item.price)} + {formatCurrency(item.size_price || 0)} ({item.size_name})
+                            <br />
+                            <span className="font-bold">
+                              = {formatCurrency(item.price + (item.size_price || 0))} each
+                            </span>
+                          </>
+                        ) : (
+                          `${formatCurrency(item.price)} each`
+                        )}
                       </p>
                     </div>
                   </div>
@@ -144,7 +151,7 @@ const KioskCartPage: React.FC = () => {
                     {/* Item Total */}
                     <div className="text-right min-w-[6rem]">
                       <p className="text-2xl font-bold text-gray-800">
-                        ${(item.price * item.quantity).toFixed(2)}
+                        {formatCurrency((item.price + (item.size_price || 0)) * item.quantity)}
                       </p>
                     </div>
 
@@ -171,17 +178,13 @@ const KioskCartPage: React.FC = () => {
           <div className="space-y-2 text-lg">
             <div className="flex justify-between">
               <span>Subtotal:</span>
-              <span>${getCartTotal().toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Tax (8%):</span>
-              <span>${(getCartTotal() * 0.08).toFixed(2)}</span>
+              <span>{formatCurrency(getCartTotal())}</span>
             </div>
             <div className="border-t pt-2 mt-2">
               <div className="flex justify-between text-2xl font-bold">
                 <span>Total:</span>
                 <span className="text-green-600">
-                  ${(getCartTotal() * 1.08).toFixed(2)}
+                  {formatCurrency(getCartTotal())}
                 </span>
               </div>
             </div>

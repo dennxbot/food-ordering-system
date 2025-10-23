@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { FoodItem } from '../types';
+import { formatCurrency } from '../utils/currency';
 import TouchButton from './TouchButton';
 
 interface MenuItemCardProps {
@@ -30,7 +31,7 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
   cardWidth = defaultCardWidth,
 }) => {
   const formatPrice = (price: number): string => {
-    return `$${price.toFixed(2)}`;
+    return formatCurrency(price);
   };
 
   const handleCardPress = () => {

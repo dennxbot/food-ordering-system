@@ -41,6 +41,7 @@ const lazyLoad = (factory: () => Promise<any>) =>
   });
 
 // Lazy load components
+const AccessSelection = lazyLoad(() => import('../pages/access-selection/page'));
 const Home = lazyLoad(() => import('../pages/home/page'));
 const Menu = lazyLoad(() => import('../pages/menu/page'));
 const Cart = lazyLoad(() => import('../pages/cart/page'));
@@ -48,13 +49,14 @@ const Checkout = lazyLoad(() => import('../pages/checkout'));
 const FoodDetails = lazyLoad(() => import('../pages/food-details/page'));
 const Login = lazyLoad(() => import('../pages/login/page'));
 const Signup = lazyLoad(() => import('../pages/signup/page'));
+const KioskLogin = lazyLoad(() => import('../pages/kiosk-login/page'));
 const Orders = lazyLoad(() => import('../pages/orders/page'));
 const OrderDetails = lazyLoad(() => import('../pages/order-details/page'));
 const OrderConfirmation = lazyLoad(() => import('../pages/order-confirmation/page'));
 const Profile = lazyLoad(() => import('../pages/profile/page'));
 const NotFound = lazyLoad(() => import('../pages/NotFound'));
 
-// Admin pages
+// Admin components
 const AdminDashboard = lazyLoad(() => import('../pages/admin/dashboard/page'));
 const AdminMenu = lazyLoad(() => import('../pages/admin/menu/page'));
 const AdminOrders = lazyLoad(() => import('../pages/admin/orders/page'));
@@ -63,15 +65,22 @@ const AdminReports = lazyLoad(() => import('../pages/admin/reports/page'));
 const AdminSettings = lazyLoad(() => import('../pages/admin/settings/page'));
 const AdminPOS = lazyLoad(() => import('../pages/admin/pos/page'));
 const AdminPOSSales = lazyLoad(() => import('../pages/admin/pos/sales/page'));
-// Kiosk pages
+
+// Kiosk components
 const KioskDashboard = lazyLoad(() => import('../pages/kiosk/dashboard/page'));
 const KioskMenu = lazyLoad(() => import('../pages/kiosk/menu/page'));
 const KioskCart = lazyLoad(() => import('../pages/kiosk/cart/page'));
+const KioskOrders = lazyLoad(() => import('../pages/kiosk/orders/page'));
 const KioskOrderSuccess = lazyLoad(() => import('../pages/kiosk/order-success/page'));
+const KioskAccessDenied = lazyLoad(() => import('../components/feature/KioskAccessDenied'));
 
 const routes: RouteObject[] = [
   {
     path: '/',
+    element: <Home />,
+  },
+  {
+    path: '/home',
     element: <Home />,
   },
   {
@@ -97,6 +106,14 @@ const routes: RouteObject[] = [
   {
     path: '/signup',
     element: <Signup />,
+  },
+  {
+    path: '/kiosk-login',
+    element: <KioskLogin />,
+  },
+  {
+    path: '/kiosk-access-denied',
+    element: <KioskAccessDenied />,
   },
   {
     path: '/orders',
@@ -140,6 +157,14 @@ const routes: RouteObject[] = [
     ),
   },
   {
+    path: '/kiosk/orders',
+    element: (
+      <ProtectedRoute requiredRole="kiosk">
+        <KioskOrders />
+      </ProtectedRoute>
+    ),
+  },
+  {
     path: '/kiosk/order-success',
     element: (
       <ProtectedRoute requiredRole="kiosk">
@@ -147,6 +172,7 @@ const routes: RouteObject[] = [
       </ProtectedRoute>
     ),
   },
+  // Admin routes
   {
     path: '/admin',
     element: (

@@ -53,21 +53,21 @@ const KioskDashboard = () => {
       title: 'Browse Menu',
       description: 'View available food items',
       icon: 'ri-restaurant-line',
-      path: '/menu',
+      path: '/kiosk/menu',
       color: 'bg-orange-500'
     },
     {
       title: 'View Cart',
       description: `${items.length} items - ${formatCurrency(total)}`,
       icon: 'ri-shopping-cart-line',
-      path: '/cart',
+      path: '/kiosk/cart',
       color: 'bg-blue-500'
     },
     {
       title: 'Order History',
       description: 'View recent orders',
       icon: 'ri-history-line',
-      path: '/orders',
+      path: '/kiosk/orders',
       color: 'bg-green-500'
     }
   ];
@@ -149,7 +149,7 @@ const KioskDashboard = () => {
                     </p>
                   </div>
                   <p className="font-semibold text-gray-900">
-                    {formatCurrency(item.price * item.quantity)}
+                    {formatCurrency((item.price + (item.size_price || 0)) * item.quantity)}
                   </p>
                 </div>
               ))}
@@ -168,17 +168,10 @@ const KioskDashboard = () => {
             
             <div className="mt-4 flex gap-3">
               <Button
-                onClick={() => navigate('/cart')}
-                className="flex-1"
-                variant="outline"
-              >
-                View Cart
-              </Button>
-              <Button
-                onClick={() => navigate('/checkout')}
+                onClick={() => navigate('/kiosk/cart')}
                 className="flex-1 bg-orange-500 hover:bg-orange-600"
               >
-                Checkout
+                Review Order
               </Button>
             </div>
           </div>
