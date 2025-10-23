@@ -141,11 +141,11 @@ const KioskDashboard = () => {
             
             <div className="space-y-3">
               {items.slice(0, 3).map((item) => (
-                <div key={`${item.id}-${item.size}`} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
+                <div key={`${item.id}-${item.size_id || 'default'}`} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
                   <div>
                     <p className="font-medium text-gray-900">{item.name}</p>
                     <p className="text-sm text-gray-600">
-                      {item.size} × {item.quantity}
+                      {item.size_name || 'Regular'} × {item.quantity}
                     </p>
                   </div>
                   <p className="font-semibold text-gray-900">

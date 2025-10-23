@@ -29,6 +29,12 @@ export interface CartItem extends FoodItem {
   size_id: string | null;
   size_name: string | null;
   size_price: number | null;
+  // Add size property for compatibility
+  size?: {
+    id: string;
+    name: string;
+    price: number;
+  };
 }
 
 export interface Order {

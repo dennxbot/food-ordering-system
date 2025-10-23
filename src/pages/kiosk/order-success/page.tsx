@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
 import { Navigate, useNavigate } from 'react-router-dom';
 
-const KioskOrderSuccessPage: React.FC = () => {
+const KioskOrderSuccessPage = () => {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [countdown, setCountdown] = useState(10);

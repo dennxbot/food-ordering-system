@@ -1,13 +1,11 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
 import { useCart } from '../../../hooks/useCart';
-import { useOrders } from '../../../hooks/useOrders';
 import { Navigate, useNavigate } from 'react-router-dom';
 
 const KioskCartPage: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
-  const { cart, updateQuantity, removeFromCart, clearCart, getCartTotal } = useCart();
-  const { createOrder } = useOrders();
+  const { cart, updateQuantity, removeFromCart, clearCart, getCartTotal, createOrder } = useCart();
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -30,18 +28,13 @@ const KioskCartPage: React.FC = () => {
     setIsProcessing(true);
     try {
       const orderData = {
-        items: cart.map(item => ({
-          menu_item_id: item.id,
-          quantity: item.quantity,
-          price: item.price,
-          name: item.name
-        })),
-        total_amount: getCartTotal(),
-        status: 'pending' as const,
-        customer_name: user?.full_name || 'Kiosk Customer',
-        customer_email: user?.email || '',
-        customer_phone: user?.contact_number || '',
-        notes: 'Kiosk Order'
+        customerName: user?.full_name || 'Kiosk Customer',
+        customerEmail: user?.email || '',
+        customerPhone: user?.contact_number || '',
+        customerAddress: 'Kiosk Order - In Store',
+        orderType: 'pickup' as const,
+        paymentMethod: 'cash' as const,
+        userId: user?.id || ''
       };
 
       await createOrder(orderData);
@@ -105,9 +98,9 @@ const KioskCartPage: React.FC = () => {
                 >
                   <div className="flex items-center space-x-4">
                     <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center">
-                      {item.image ? (
+                      {item.image_url ? (
                         <img
-                          src={item.image}
+                          src={item.image_url}
                           alt={item.name}
                           className="w-full h-full object-cover rounded-lg"
                         />

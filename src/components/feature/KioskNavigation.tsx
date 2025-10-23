@@ -1,9 +1,8 @@
-import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useCart } from '../../hooks/useCart';
 
-const KioskNavigation: React.FC = () => {
+const KioskNavigation = () => {
   const { logout } = useAuth();
   const { cart } = useCart();
   const location = useLocation();

@@ -710,6 +710,10 @@ export const useCart = () => {
     clearCart,
     getTotalPrice,
     getTotalItems,
-    createOrder
+    createOrder,
+    // Add aliases for compatibility
+    cart: items,
+    getCartTotal: getTotalPrice,
+    total: getTotalPrice()
   };
 };
