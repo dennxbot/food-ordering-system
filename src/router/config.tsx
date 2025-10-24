@@ -61,6 +61,7 @@ const AdminDashboard = lazyLoad(() => import('../pages/admin/dashboard/page'));
 const AdminMenu = lazyLoad(() => import('../pages/admin/menu/page'));
 const AdminOrders = lazyLoad(() => import('../pages/admin/orders/page'));
 const AdminCustomers = lazyLoad(() => import('../pages/admin/customers/page'));
+const AdminCategories = lazyLoad(() => import('../pages/admin/categories/page'));
 const AdminReports = lazyLoad(() => import('../pages/admin/reports/page'));
 const AdminSettings = lazyLoad(() => import('../pages/admin/settings/page'));
 const AdminPOS = lazyLoad(() => import('../pages/admin/pos/page'));
@@ -202,6 +203,14 @@ const routes: RouteObject[] = [
     element: (
       <ProtectedRoute requiredRole="admin">
         <AdminCustomers />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/admin/categories',
+    element: (
+      <ProtectedRoute requiredRole="admin">
+        <AdminCategories />
       </ProtectedRoute>
     ),
   },

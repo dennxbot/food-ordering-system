@@ -39,6 +39,12 @@ const AdminSidebar = () => {
       active: location.pathname === '/admin/menu'
     },
     {
+      icon: 'ri-folder-line',
+      label: 'Categories',
+      path: '/admin/categories',
+      active: location.pathname === '/admin/categories'
+    },
+    {
       icon: 'ri-user-line',
       label: 'Customers',
       path: '/admin/customers',
