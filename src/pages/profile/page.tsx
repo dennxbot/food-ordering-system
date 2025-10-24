@@ -23,7 +23,7 @@ const Profile = () => {
       setFormData({
         fullName: user.full_name || '',
         email: user.email || '',
-        contactNumber: user.contact_number || '',
+        contactNumber: user.phone || '',
         address: user.address || ''
       });
     }
@@ -44,7 +44,7 @@ const Profile = () => {
       await updateProfile({
         full_name: formData.fullName,
         email: formData.email,
-        contact_number: formData.contactNumber,
+        phone: formData.contactNumber,
         address: formData.address
       });
       setIsEditing(false);

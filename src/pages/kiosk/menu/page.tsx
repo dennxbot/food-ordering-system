@@ -53,7 +53,7 @@ const KioskMenuPage: React.FC = () => {
 
     // Add item without size
     try {
-      await addToCart({ ...item, has_sizes: item.has_sizes || false }, 1);
+      await addToCart({ ...item, has_sizes: item.has_sizes || false }, undefined, 1);
       // Optional: Show success feedback
     } catch (error) {
       console.error('Failed to add item to cart:', error);
@@ -65,10 +65,8 @@ const KioskMenuPage: React.FC = () => {
     try {
       await addToCart(
         { ...item, has_sizes: item.has_sizes || false },
-        1,
-        selectedSize?.id || null,
-        selectedSize?.name || null,
-        selectedSize?.price || null
+        selectedSize?.id || undefined,
+        1
       );
       setShowSizeModal(false);
       setSelectedItemForSize(null);

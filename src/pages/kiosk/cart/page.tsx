@@ -26,7 +26,7 @@ const KioskCartPage: React.FC = () => {
       const orderData = {
         customerName: user?.full_name || 'Kiosk Customer',
         customerEmail: user?.email || undefined,
-        customerPhone: user?.contact_number || 'N/A',
+        customerPhone: user?.phone || 'N/A',
         customerAddress: 'Kiosk Order - In Store',
         orderType: 'pickup' as const,
         paymentMethod: 'cash' as const,

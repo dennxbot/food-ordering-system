@@ -58,7 +58,7 @@ const AdminSettings = () => {
       setProfileData({
         full_name: user.full_name || '',
         email: user.email || '',
-        contact_number: user.contact_number || '',
+        contact_number: user.phone || '',
         address: user.address || ''
       });
     }

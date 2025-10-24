@@ -12,7 +12,7 @@ export default function Checkout() {
   const { user } = useAuth();
   const [formData, setFormData] = useState({
     fullName: user?.full_name || '',
-    contactNumber: user?.contact_number || '',
+    contactNumber: user?.phone || '',
     address: user?.address || '',
     deliveryMethod: 'delivery',
     paymentMethod: 'cash'
@@ -24,7 +24,7 @@ export default function Checkout() {
       setFormData(prev => ({
         ...prev,
         fullName: user.full_name || prev.fullName,
-        contactNumber: user.contact_number || prev.contactNumber,
+        contactNumber: user.phone || prev.contactNumber,
         address: user.address || prev.address
       }));
     }

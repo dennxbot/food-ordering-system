@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
 import { useKioskCart } from '../../../hooks/useKioskCart';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '../../../components/ui/Button';
+import Button from '../../../components/base/Button';
 import { formatCurrency } from '../../../utils/currency';
 
 const KioskDashboard = () => {
