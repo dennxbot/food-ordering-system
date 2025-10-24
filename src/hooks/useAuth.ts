@@ -92,9 +92,10 @@ export const useAuth = () => {
       });
 
       if (authError || !authData.user) {
+        console.error('Supabase auth error:', authError);
         return {
           success: false,
-          error: 'Invalid email or credentials. Please check your credentials.'
+          error: authError?.message || 'Invalid email or credentials. Please check your credentials.'
         };
       }
 
@@ -168,54 +169,59 @@ export const useAuth = () => {
     try {
       setIsLoading(true);
       
-      // Check if user already exists
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('email')
-        .eq('email', userData.email)
-        .single();
+      // First, create user with Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: userData.email,
+        password: userData.password,
+        options: {
+          data: {
+            full_name: userData.fullName,
+          }
+        }
+      });
 
-      if (existingUser) {
+      if (authError || !authData.user) {
         return {
           success: false,
-          error: 'User with this email already exists'
+          error: authError?.message || 'Failed to create account'
         };
       }
 
-      // Create new user with proper database structure
-      const newUser = {
+      // Then create user profile in users table
+      const newUserProfile = {
+        id: authData.user.id,
         email: userData.email,
-        password: userData.password,
         full_name: userData.fullName,
         phone: userData.contactNumber || null,
         address: userData.address || null,
-        role: userData.role || 'customer',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        role: userData.role || 'customer'
       };
 
       const { data, error } = await supabase
         .from('users')
-        .insert(newUser)
+        .insert(newUserProfile)
         .select('id, email, full_name, phone, address, role, is_active, created_at, updated_at')
         .single();
 
       if (error) {
         console.error('Database error:', error);
+        // If profile creation fails, we should clean up the auth user
+        await supabase.auth.signOut();
         return {
           success: false,
-          error: error.message || 'Failed to create account'
+          error: error.message || 'Failed to create user profile'
         };
       }
 
       if (!data) {
+        await supabase.auth.signOut();
         return {
           success: false,
           error: 'Failed to create account - no data returned'
         };
       }
 
-      // Auto login after signup
+      // Set user data
       localStorage.setItem('currentUser', JSON.stringify(data));
       setUser(data);
 
@@ -269,35 +275,14 @@ export const useAuth = () => {
     }
 
     try {
-      // First verify the current password
-      const { data: verifyData, error: verifyError } = await supabase
-        .from('users')
-        .select('password')
-        .eq('id', user.id)
-        .eq('password', currentPassword)
-        .single();
-
-      if (verifyError || !verifyData) {
-        return { success: false, error: 'Current password is incorrect' };
-      }
-
-      // Update the password
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({
-          password: newPassword,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id);
+      // Use Supabase Auth to update the password
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword
+      });
 
       if (updateError) {
         throw updateError;
       }
-
-      // Update localStorage with new password
-      const updatedUser = { ...user, password: newPassword };
-      localStorage.setItem('currentUser', JSON.stringify(updatedUser));
-      setUser(updatedUser);
 
       return { success: true };
     } catch (error: any) {

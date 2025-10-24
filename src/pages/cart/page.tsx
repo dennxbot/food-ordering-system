@@ -9,9 +9,21 @@ import BottomNavigation from '../../components/feature/BottomNavigation';
 export default function Cart() {
   const navigate = useNavigate();
   const { items: cartItems, updateQuantity, removeFromCart, getTotalPrice } = useCart();
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
 
-  // Add loading state check
+  // Add loading state check for authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-red-50 flex items-center justify-center pb-20 lg:pb-8">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-orange-200 border-t-orange-500 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Add loading state check for cart items
   if (!cartItems) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-red-50 flex items-center justify-center pb-20 lg:pb-8">
