@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
-import { useCart } from '../../../hooks/useCart';
+import { useKioskCart } from '../../../hooks/useKioskCart';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { formatCurrency } from '../../../utils/currency';
 
 const KioskCartPage: React.FC = () => {
   const { user } = useAuth();
-  const { cart, updateQuantity, removeFromCart, clearCart, getCartTotal, createOrder } = useCart();
+  const { cart, updateQuantity, removeFromCart, clearCart, getCartTotal, createKioskOrder } = useKioskCart();
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -25,16 +25,16 @@ const KioskCartPage: React.FC = () => {
     try {
       const orderData = {
         customerName: user?.full_name || 'Kiosk Customer',
-        customerEmail: user?.email || '',
-        customerPhone: user?.contact_number || '',
+        customerEmail: user?.email || undefined,
+        customerPhone: user?.contact_number || 'N/A',
         customerAddress: 'Kiosk Order - In Store',
         orderType: 'pickup' as const,
         paymentMethod: 'cash' as const,
-        userId: user?.id || '',
-        orderSource: 'kiosk' as const
+        notes: 'Order placed via kiosk',
+        kioskId: 'KIOSK-001' // You can make this dynamic based on actual kiosk ID
       };
 
-      const order = await createOrder(orderData);
+      const order = await createKioskOrder(orderData);
       clearCart();
       navigate('/kiosk/order-success', { state: { orderId: order.id } });
     } catch (error) {

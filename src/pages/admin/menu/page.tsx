@@ -74,7 +74,12 @@ const AdminMenu = () => {
         .eq('is_active', true)
         .order('name');
 
-      if (categoriesError) throw categoriesError;
+      if (categoriesError) {
+        console.error('Error fetching categories:', categoriesError);
+        setCategories([]);
+      } else {
+        setCategories(categoriesData || []);
+      }
 
       // Fetch menu items with categories
       const { data: menuData, error: menuError } = await supabase
@@ -85,12 +90,16 @@ const AdminMenu = () => {
         `)
         .order('name');
 
-      if (menuError) throw menuError;
-
-      setCategories(categoriesData || []);
-      setMenuItems(menuData || []);
+      if (menuError) {
+        console.error('Error fetching menu items:', menuError);
+        setMenuItems([]);
+      } else {
+        setMenuItems(menuData || []);
+      }
     } catch (error) {
       console.error('Error fetching menu data:', error);
+      setCategories([]);
+      setMenuItems([]);
     } finally {
       setLoading(false);
     }

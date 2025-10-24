@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
-import { useCart } from '../../../hooks/useCart';
+import { useKioskCart } from '../../../hooks/useKioskCart';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '../../../components/ui/Button';
 import { formatCurrency } from '../../../utils/currency';
-import Button from '../../../components/base/Button';
 
 const KioskDashboard = () => {
   const navigate = useNavigate();
   const { user, isLoading, isAuthenticated, isKiosk } = useAuth();
-  const { items, total, clearCart } = useCart();
+  const { items, total, clearCart } = useKioskCart();
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {

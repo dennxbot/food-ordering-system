@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useFoodItems } from '../../../hooks/useFoodItems';
-import { useCart } from '../../../hooks/useCart';
+import { useKioskCart } from '../../../hooks/useKioskCart';
 import { useItemSizes } from '../../../hooks/useItemSizes';
 import { formatCurrency } from '../../../utils/currency';
 
@@ -33,7 +33,7 @@ interface Size {
 
 const KioskMenuPage: React.FC = () => {
   const { foodItems, categories, isLoading } = useFoodItems();
-  const { addToCart, cart } = useCart();
+  const { addToCart, cart } = useKioskCart();
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [showSizeModal, setShowSizeModal] = useState(false);
   const [selectedItemForSize, setSelectedItemForSize] = useState<FoodItem | null>(null);

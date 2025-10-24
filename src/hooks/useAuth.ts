@@ -6,10 +6,12 @@ interface UserProfile {
   id: string;
   email: string;
   full_name: string;
-  contact_number: string | null;
+  phone: string | null;
   address: string | null;
   role: 'customer' | 'admin' | 'kiosk';
-  password: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export const useAuth = () => {
@@ -17,41 +19,121 @@ export const useAuth = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is logged in from localStorage
-    const storedUser = localStorage.getItem('currentUser');
-    if (storedUser) {
+    // Initialize auth state from Supabase session
+    const initializeAuth = async () => {
       try {
-        const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          // Get user profile from users table
+          const { data: userProfile } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+
+          if (userProfile) {
+            setUser(userProfile);
+            localStorage.setItem('currentUser', JSON.stringify(userProfile));
+          }
+        } else {
+          // Check if user is logged in from localStorage (fallback)
+          const storedUser = localStorage.getItem('currentUser');
+          if (storedUser) {
+            try {
+              const parsedUser = JSON.parse(storedUser);
+              setUser(parsedUser);
+            } catch (error) {
+              console.error('Error parsing stored user:', error);
+              localStorage.removeItem('currentUser');
+            }
+          }
+        }
       } catch (error) {
-        console.error('Error parsing stored user:', error);
-        localStorage.removeItem('currentUser');
+        console.error('Error initializing auth:', error);
+      } finally {
+        setIsLoading(false);
       }
-    }
-    setIsLoading(false);
+    };
+
+    initializeAuth();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT' || !session) {
+        setUser(null);
+        localStorage.removeItem('currentUser');
+      } else if (event === 'SIGNED_IN' && session?.user) {
+        // Get user profile when signed in
+        const { data: userProfile } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+
+        if (userProfile) {
+          setUser(userProfile);
+          localStorage.setItem('currentUser', JSON.stringify(userProfile));
+        }
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const login = async (email: string, password: string): Promise<{ success: boolean; user?: UserProfile; error?: string }> => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('email', email)
-        .eq('password', password)
-        .single();
+      
+      // Use Supabase Auth for authentication
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-      if (error || !data) {
+      if (authError || !authData.user) {
         return {
           success: false,
           error: 'Invalid email or credentials. Please check your credentials.'
         };
       }
 
+      // Get user profile from users table
+      let { data: userProfile, error: profileError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', authData.user.id)
+        .single();
+
+      if (profileError || !userProfile) {
+        // If user doesn't exist in users table, create a basic profile
+        const { data: newProfile, error: createError } = await supabase
+          .from('users')
+          .insert({
+            id: authData.user.id,
+            email: authData.user.email!,
+            full_name: authData.user.user_metadata?.full_name || 'User',
+            role: 'customer'
+          })
+          .select()
+          .single();
+
+        if (createError || !newProfile) {
+          await supabase.auth.signOut();
+          return {
+            success: false,
+            error: 'Failed to create user profile. Please contact support.'
+          };
+        }
+
+        userProfile = newProfile;
+      }
+
       // Check if kiosk user is trying to login from unauthorized URL
-      if (data.role === 'kiosk') {
+      if (userProfile.role === 'kiosk') {
         const currentPath = window.location.pathname;
         if (currentPath !== '/kiosk-login') {
+          await supabase.auth.signOut();
           return {
             success: false,
             error: 'Kiosk accounts can only be accessed from the kiosk login page. Please use the designated kiosk terminal.'
@@ -60,10 +142,10 @@ export const useAuth = () => {
       }
 
       // Store user in localStorage and state
-      localStorage.setItem('currentUser', JSON.stringify(data));
-      setUser(data);
+      localStorage.setItem('currentUser', JSON.stringify(userProfile));
+      setUser(userProfile);
 
-      return { success: true, user: data };
+      return { success: true, user: userProfile };
     } catch (error: any) {
       console.error('Login error:', error);
       return {
@@ -105,7 +187,7 @@ export const useAuth = () => {
         email: userData.email,
         password: userData.password,
         full_name: userData.fullName,
-        contact_number: userData.contactNumber || null,
+        phone: userData.contactNumber || null,
         address: userData.address || null,
         role: userData.role || 'customer',
         created_at: new Date().toISOString(),
@@ -115,7 +197,7 @@ export const useAuth = () => {
       const { data, error } = await supabase
         .from('users')
         .insert(newUser)
-        .select('id, email, full_name, contact_number, address, role, created_at')
+        .select('id, email, full_name, phone, address, role, is_active, created_at, updated_at')
         .single();
 
       if (error) {
@@ -133,15 +215,9 @@ export const useAuth = () => {
         };
       }
 
-      // Create the user object with password for local storage
-      const userWithPassword = {
-        ...data,
-        password: userData.password
-      };
-
       // Auto login after signup
-      localStorage.setItem('currentUser', JSON.stringify(userWithPassword));
-      setUser(userWithPassword);
+      localStorage.setItem('currentUser', JSON.stringify(data));
+      setUser(data);
 
       return { success: true };
     } catch (error: any) {
@@ -156,6 +232,7 @@ export const useAuth = () => {
   };
 
   const logout = async () => {
+    await supabase.auth.signOut();
     localStorage.removeItem('currentUser');
     setUser(null);
   };

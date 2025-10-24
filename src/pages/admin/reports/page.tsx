@@ -96,9 +96,46 @@ const AdminReports = () => {
           p_end_date: end
         });
 
-      if (reportError) throw reportError;
+      if (reportError) {
+        console.error('Error fetching report data:', reportError);
+        // Set empty report data on error
+        setReportData({
+          totalOrders: 0,
+          totalSales: 0,
+          avgOrderValue: 0,
+          ordersByStatus: {
+            pending: 0,
+            preparing: 0,
+            ready: 0,
+            out_for_delivery: 0,
+            completed: 0,
+            cancelled: 0
+          },
+          topSellingItems: [],
+          dailySales: []
+        });
+        return;
+      }
 
-      if (!reportData || !reportData[0]) throw new Error('No report data returned');
+      if (!reportData || !reportData[0]) {
+        // Handle empty data case
+        setReportData({
+          totalOrders: 0,
+          totalSales: 0,
+          avgOrderValue: 0,
+          ordersByStatus: {
+            pending: 0,
+            preparing: 0,
+            ready: 0,
+            out_for_delivery: 0,
+            completed: 0,
+            cancelled: 0
+          },
+          topSellingItems: [],
+          dailySales: []
+        });
+        return;
+      }
 
       const report = reportData[0];
       

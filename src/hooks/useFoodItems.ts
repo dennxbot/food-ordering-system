@@ -33,8 +33,12 @@ export const useFoodItems = () => {
         .eq('is_active', true)
         .order('name');
 
-      if (categoriesError) throw categoriesError;
-      setCategories(categoriesData || []);
+      if (categoriesError) {
+        console.error('Error fetching categories:', categoriesError);
+        setCategories([]);
+      } else {
+        setCategories(categoriesData || []);
+      }
 
       // Fetch ALL food items with category info (don't filter by availability here)
       const { data: foodItemsData, error: foodItemsError } = await supabase
@@ -45,12 +49,20 @@ export const useFoodItems = () => {
         `)
         .order('name');
 
-      if (foodItemsError) throw foodItemsError;
-      setFoodItems(foodItemsData || []);
+      if (foodItemsError) {
+        console.error('Error fetching food items:', foodItemsError);
+        setFoodItems([]);
+      } else {
+        setFoodItems(foodItemsData || []);
+      }
 
     } catch (error) {
       console.error('Error fetching data:', error);
+      // Ensure loading state is cleared even on error
+      setCategories([]);
+      setFoodItems([]);
     } finally {
+      // Always clear loading state
       setIsLoading(false);
     }
   };

@@ -155,6 +155,7 @@ export type Database = {
           payment_method: 'cash' | 'card' | 'online';
           status: 'pending' | 'preparing' | 'ready' | 'out_for_delivery' | 'completed' | 'cancelled';
           total_amount: number;
+          order_source: 'online' | 'kiosk' | 'pos';
           notes: string | null;
           created_at: string;
           updated_at: string;
@@ -170,6 +171,7 @@ export type Database = {
           payment_method?: 'cash' | 'card' | 'online';
           status?: 'pending' | 'preparing' | 'ready' | 'out_for_delivery' | 'completed' | 'cancelled';
           total_amount: number;
+          order_source?: 'online' | 'kiosk' | 'pos';
           notes?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -185,6 +187,7 @@ export type Database = {
           payment_method?: 'cash' | 'card' | 'online';
           status?: 'pending' | 'preparing' | 'ready' | 'out_for_delivery' | 'completed' | 'cancelled';
           total_amount?: number;
+          order_source?: 'online' | 'kiosk' | 'pos';
           notes?: string | null;
           created_at?: string;
           updated_at?: string;

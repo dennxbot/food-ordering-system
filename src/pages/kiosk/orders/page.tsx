@@ -1,25 +1,14 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../../../hooks/useAuth';
-import { Navigate, useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
+import { useAuth } from '../../../hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
 import { formatCurrency } from '../../../utils/currency';
-import type { Order } from '../../../types';
-
-interface KioskOrder extends Order {
-  order_items: {
-    id: string;
-    quantity: number;
-    unit_price: number;
-    food_item: {
-      name: string;
-    };
-  }[];
-}
+import type { KioskOrderWithItems } from '../../../lib/supabase-types';
 
 const KioskOrdersPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [orders, setOrders] = useState<KioskOrder[]>([]);
+  const [orders, setOrders] = useState<KioskOrderWithItems[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -30,16 +19,16 @@ const KioskOrdersPage = () => {
     try {
       setIsLoading(true);
 
-      // Fetch recent orders (last 20) for kiosk display
+      // Fetch recent kiosk orders (last 20) for kiosk display
       const { data: ordersData, error } = await supabase
-        .from('orders')
+        .from('kiosk_orders')
         .select(`
           *,
-          order_items (
+          kiosk_order_items (
             id,
             quantity,
             unit_price,
-            food_item:food_items (
+            food_items (
               name
             )
           )
@@ -47,11 +36,15 @@ const KioskOrdersPage = () => {
         .order('created_at', { ascending: false })
         .limit(20);
 
-      if (error) throw error;
-
-      setOrders(ordersData || []);
+      if (error) {
+        console.error('Error fetching kiosk orders:', error);
+        setOrders([]);
+      } else {
+        setOrders(ordersData || []);
+      }
     } catch (error) {
-      console.error('Error fetching orders:', error);
+      console.error('Error fetching kiosk orders:', error);
+      setOrders([]);
     } finally {
       setIsLoading(false);
     }
@@ -159,7 +152,7 @@ const KioskOrdersPage = () => {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className={`px-4 py-2 rounded-xl text-sm font-bold capitalize ${getStatusColor(order.status)}`}>
-                      {getStatusLabel(order.status, order.order_source)}
+                      {getStatusLabel(order.status, 'kiosk')}
                     </span>
                     <span className="text-2xl font-bold text-orange-600">
                       {formatCurrency(order.total_amount)}
@@ -176,9 +169,9 @@ const KioskOrdersPage = () => {
                       Order Items
                     </h4>
                     <div className="space-y-2">
-                      {order.order_items?.map((item, index) => (
+                      {order.kiosk_order_items?.map((item, index) => (
                         <div key={index} className="flex justify-between text-sm">
-                          <span>{item.quantity}x {item.food_item?.name}</span>
+                          <span>{item.quantity}x {item.food_items?.name}</span>
                           <span className="font-medium">{formatCurrency(item.unit_price * item.quantity)}</span>
                         </div>
                       ))}

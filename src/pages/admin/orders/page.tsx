@@ -89,11 +89,15 @@ const AdminOrders = () => {
 
       const { data: ordersData, error } = await query;
 
-      if (error) throw error;
-
-      setOrders(ordersData || []);
+      if (error) {
+        console.error('Error fetching orders:', error);
+        setOrders([]);
+      } else {
+        setOrders(ordersData || []);
+      }
     } catch (error) {
       console.error('Error fetching orders:', error);
+      setOrders([]);
     } finally {
       setLoading(false);
     }
@@ -101,6 +105,8 @@ const AdminOrders = () => {
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
+      console.log('Updating order status:', { orderId, newStatus }); // Debug log
+      
       const { error } = await supabase
         .from('orders')
         .update({ 
@@ -110,6 +116,8 @@ const AdminOrders = () => {
         .eq('id', orderId);
 
       if (error) throw error;
+
+      console.log('Order status updated successfully'); // Debug log
 
       // Update local state
       setOrders(orders.map(order =>
@@ -188,10 +196,15 @@ const AdminOrders = () => {
     return `${Math.floor(diffInMinutes / 1440)} day${Math.floor(diffInMinutes / 1440) > 1 ? 's' : ''} ago`;
   };
 
-  const getNextStatus = (currentStatus: string, orderType: string) => {
+  const getNextStatus = (currentStatus: string, orderType: string, orderSource?: string) => {
+    console.log('getNextStatus called with:', { currentStatus, orderType, orderSource }); // Debug log
+    
     switch (currentStatus) {
       case 'pending':
-        return 'preparing';
+        // For kiosk orders, skip to completed since payment is direct at cashier
+        const nextStatus = orderSource === 'kiosk' ? 'completed' : 'preparing';
+        console.log('Next status for pending order:', nextStatus); // Debug log
+        return nextStatus;
       case 'preparing':
         return orderType === 'delivery' ? 'out_for_delivery' : 'ready';
       case 'ready':
@@ -206,8 +219,8 @@ const AdminOrders = () => {
   const getNextStatusLabel = (currentStatus: string, orderType: string, orderSource?: string) => {
     switch (currentStatus) {
       case 'pending':
-        // For kiosk orders, show "Approve" instead of "Start Preparing"
-        return orderSource === 'kiosk' ? 'Approve' : 'Start Preparing';
+        // For kiosk orders, show "Complete Order" since payment is direct at cashier
+        return orderSource === 'kiosk' ? 'Complete Order' : 'Start Preparing';
       case 'preparing':
         return orderType === 'delivery' ? 'Out for Delivery' : 'Ready for Pickup';
       case 'ready':
@@ -462,9 +475,9 @@ const AdminOrders = () => {
                     {/* Action Buttons */}
                     {order.status !== 'completed' && order.status !== 'cancelled' && (
                       <div className="flex flex-col gap-3 lg:min-w-[200px]">
-                        {getNextStatus(order.status, order.order_type) && (
+                        {getNextStatus(order.status, order.order_type, order.order_source) && (
                           <Button
-                            onClick={() => updateOrderStatus(order.id, getNextStatus(order.status, order.order_type)!)}
+                            onClick={() => updateOrderStatus(order.id, getNextStatus(order.status, order.order_type, order.order_source)!)}
                             className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
                           >
                             <i className="ri-arrow-right-line"></i>
