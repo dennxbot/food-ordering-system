@@ -39,17 +39,28 @@ export const useAuth = () => {
     // Simple initialization
     const initializeAuth = async () => {
       try {
-        // Check localStorage first
+        // Check localStorage first, but verify with Supabase session
         const storedUser = localStorage.getItem('currentUser');
         if (storedUser) {
           try {
             const parsedUser = JSON.parse(storedUser);
             if (parsedUser.id && parsedUser.email && parsedUser.role) {
               console.log('✅ Found stored user:', parsedUser.role);
-              setUser(parsedUser);
-              setIsLoading(false);
-              setIsInitialized(true);
-              return;
+              
+              // Verify the session is still valid in Supabase
+              const { data: { session } } = await supabase.auth.getSession();
+              if (session?.user?.id === parsedUser.id) {
+                console.log('✅ Session verified, using cached user');
+                setUser(parsedUser);
+                setIsLoading(false);
+                setIsInitialized(true);
+                return;
+              } else {
+                console.warn('⚠️ Stored user session expired, clearing cache');
+                localStorage.removeItem('currentUser');
+                localStorage.removeItem('rememberEmail');
+                // Don't return, continue to check Supabase
+              }
             }
           } catch (error) {
             console.warn('🧹 Cleaning corrupted user data');
