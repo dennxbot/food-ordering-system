@@ -5,7 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 const AdminSidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout } = useAuth();
+  const { logout, resetAuth } = useAuth();
 
   const menuItems = [
     {
@@ -69,6 +69,11 @@ const AdminSidebar = () => {
     navigate('/login');
   };
 
+  const handleResetAuth = () => {
+    resetAuth();
+    navigate('/login');
+  };
+
   return (
     <div className="w-64 bg-white shadow-lg h-screen fixed left-0 top-0 z-40">
       <div className="p-6 border-b border-gray-200">
@@ -99,7 +104,14 @@ const AdminSidebar = () => {
         </ul>
       </nav>
 
-      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
+      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 space-y-2">
+        <button
+          onClick={handleResetAuth}
+          className="w-full flex items-center px-4 py-2 rounded-lg text-left text-orange-600 hover:bg-orange-50 transition-colors text-sm"
+        >
+          <i className="ri-refresh-line text-lg mr-3"></i>
+          <span className="font-medium">Reset Data</span>
+        </button>
         <button
           onClick={handleLogout}
           className="w-full flex items-center px-4 py-3 rounded-lg text-left text-red-600 hover:bg-red-50 transition-colors"
