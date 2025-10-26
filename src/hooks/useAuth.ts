@@ -116,6 +116,8 @@ export const useAuth = () => {
       if (event === 'SIGNED_OUT' || !session) {
         setUser(null);
         localStorage.removeItem('currentUser');
+        setIsLoading(false); // Reset loading state on sign out
+        setIsInitialized(true); // Ensure auth is initialized
       } else if (event === 'SIGNED_IN' && session?.user) {
         const { data: userProfile } = await supabase
           .from('users')
@@ -126,6 +128,8 @@ export const useAuth = () => {
         if (userProfile && isMounted) {
           setUser(userProfile);
           localStorage.setItem('currentUser', JSON.stringify(userProfile));
+          setIsLoading(false); // Reset loading state on sign in
+          setIsInitialized(true); // Ensure auth is initialized
         }
       }
     });
@@ -275,10 +279,22 @@ export const useAuth = () => {
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
-    localStorage.removeItem('currentUser');
-    localStorage.removeItem('rememberEmail');
-    setUser(null);
+    try {
+      await supabase.auth.signOut();
+      localStorage.removeItem('currentUser');
+      localStorage.removeItem('rememberEmail');
+      setUser(null);
+      setIsLoading(false); // Reset loading state
+      setIsInitialized(true); // Ensure auth is initialized
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Even if logout fails, reset the state
+      setUser(null);
+      setIsLoading(false);
+      setIsInitialized(true);
+      localStorage.removeItem('currentUser');
+      localStorage.removeItem('rememberEmail');
+    }
   };
 
   // Emergency reset function to clear all auth data
