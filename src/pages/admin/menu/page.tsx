@@ -232,6 +232,39 @@ const AdminMenu = () => {
     }
 
     try {
+      // First, check if the item is referenced in any orders
+      const { data: orderItems, error: checkError } = await supabase
+        .from('kiosk_order_items')
+        .select('id')
+        .eq('food_item_id', id)
+        .limit(1);
+
+      if (checkError) {
+        console.error('Error checking references:', checkError);
+      }
+
+      if (orderItems && orderItems.length > 0) {
+        alert('Cannot delete this item because it has been used in orders. You can disable it instead by setting it as unavailable.');
+        return;
+      }
+
+      // Also check regular order items
+      const { data: regularOrderItems, error: regularCheckError } = await supabase
+        .from('order_items')
+        .select('id')
+        .eq('food_item_id', id)
+        .limit(1);
+
+      if (regularCheckError) {
+        console.error('Error checking regular order references:', regularCheckError);
+      }
+
+      if (regularOrderItems && regularOrderItems.length > 0) {
+        alert('Cannot delete this item because it has been used in orders. You can disable it instead by setting it as unavailable.');
+        return;
+      }
+
+      // If no references found, proceed with deletion
       const { error } = await supabase
         .from('food_items')
         .delete()
@@ -240,9 +273,15 @@ const AdminMenu = () => {
       if (error) throw error;
 
       setMenuItems(menuItems.filter(item => item.id !== id));
-    } catch (error) {
+      alert('Menu item deleted successfully!');
+    } catch (error: any) {
       console.error('Error deleting menu item:', error);
-      alert('Error deleting menu item. Please try again.');
+      
+      if (error.code === '23503') {
+        alert('Cannot delete this item because it has been used in orders. You can disable it instead by setting it as unavailable.');
+      } else {
+        alert('Error deleting menu item. Please try again.');
+      }
     }
   };
 
