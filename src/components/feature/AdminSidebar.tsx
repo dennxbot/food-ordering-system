@@ -72,15 +72,9 @@ const AdminSidebar = () => {
   return (
     <div className="w-64 bg-white shadow-lg h-screen fixed left-0 top-0 z-40">
       <div className="p-6 border-b border-gray-200">
-        <div className="flex items-center">
-          <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center mr-3">
-            <i className="ri-restaurant-line text-xl text-orange-600"></i>
-          </div>
-          <div>
-            <h1 className="font-bold text-lg" style={{ fontFamily: '"Pacifico", serif' }}>
-              logo
-            </h1>
-            <p className="text-xs text-gray-600">Admin Panel</p>
+        <div className="flex items-center justify-center">
+          <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center shadow-lg">
+            <span className="text-3xl">🍽️</span>
           </div>
         </div>
       </div>
