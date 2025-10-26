@@ -2,7 +2,6 @@ import { BrowserRouter } from 'react-router-dom'
 import { AppRoutes } from './router'
 import { Suspense, Component, type ReactNode } from 'react'
 import AppLayout from './components/layout/AppLayout'
-import AuthDebug from './components/debug/AuthDebug'
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   constructor(props: { children: ReactNode }) {
@@ -62,7 +61,6 @@ function AppContent() {
         <AppLayout>
           <AppRoutes />
         </AppLayout>
-        <AuthDebug />
       </Suspense>
     </ErrorBoundary>
   );
