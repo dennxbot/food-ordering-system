@@ -23,6 +23,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 // Connection monitoring and auto-reconnection
 let connectionCheckInterval: NodeJS.Timeout | null = null;
 let isConnected = true;
+let lastConnectionAttempt = 0;
+let connectionFailureCount = 0;
 
 export const startConnectionMonitoring = () => {
   if (connectionCheckInterval) return;
@@ -31,17 +33,49 @@ export const startConnectionMonitoring = () => {
     try {
       const { data, error } = await supabase.from('users').select('count').limit(1);
       if (error) {
-        console.warn('🔌 Supabase connection lost, attempting reconnection...');
+        connectionFailureCount++;
+        console.warn('🔌 Supabase connection lost, attempting reconnection...', {
+          failureCount: connectionFailureCount,
+          error: error.message
+        });
         isConnected = false;
-        // Trigger reconnection by refreshing auth
-        await supabase.auth.refreshSession();
+        
+        // Only attempt reconnection if we haven't tried recently and failure count is reasonable
+        const now = Date.now();
+        const timeSinceLastAttempt = now - lastConnectionAttempt;
+        
+        if (timeSinceLastAttempt > 60000 && connectionFailureCount < 5) { // 1 minute cooldown, max 5 attempts
+          lastConnectionAttempt = now;
+          try {
+            await supabase.auth.refreshSession();
+          } catch (refreshError) {
+            console.warn('🔌 Token refresh failed:', refreshError);
+          }
+        } else if (connectionFailureCount >= 5) {
+          console.warn('🔌 Too many connection failures, stopping reconnection attempts');
+          stopConnectionMonitoring();
+        }
       } else if (!isConnected) {
         console.log('✅ Supabase connection restored');
         isConnected = true;
+        connectionFailureCount = 0; // Reset failure count on successful connection
       }
     } catch (error) {
+      connectionFailureCount++;
       console.warn('🔌 Connection check failed:', error);
       isConnected = false;
+      
+      // Check if it's a network error
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        console.warn('🌐 Network appears to be disconnected, pausing connection monitoring');
+        stopConnectionMonitoring();
+        
+        // Restart monitoring after a longer delay when network might be back
+        setTimeout(() => {
+          console.log('🔄 Restarting connection monitoring...');
+          startConnectionMonitoring();
+        }, 120000); // 2 minutes
+      }
     }
   }, 30000); // Check every 30 seconds
 };
@@ -51,6 +85,15 @@ export const stopConnectionMonitoring = () => {
     clearInterval(connectionCheckInterval);
     connectionCheckInterval = null;
   }
+};
+
+export const resetConnectionMonitoring = () => {
+  console.log('🔄 Resetting connection monitoring...');
+  stopConnectionMonitoring();
+  connectionFailureCount = 0;
+  lastConnectionAttempt = 0;
+  isConnected = true;
+  startConnectionMonitoring();
 };
 
 // Start monitoring on module load
