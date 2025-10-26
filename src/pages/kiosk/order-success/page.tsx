@@ -160,16 +160,29 @@ const KioskOrderSuccessPage = () => {
     
     // Create order items section for receipt
     let orderItemsHTML = '';
+    console.log('🖨️ Receipt Debug: orderData.kiosk_order_items:', orderData?.kiosk_order_items);
+    
     if (orderData && orderData.kiosk_order_items && orderData.kiosk_order_items.length > 0) {
       orderItemsHTML = `
         <div style="margin: 20px 0;">
           <p style="font-weight: bold; margin-bottom: 10px;">ORDER ITEMS:</p>
-          ${orderData.kiosk_order_items.map((item: any) => `
+          ${orderData.kiosk_order_items.map((item: any) => {
+            // Debug each item
+            console.log('🖨️ Receipt item:', item);
+            
+            const itemName = item.food_items?.name || 'Unknown Item';
+            const sizeName = item.item_sizes?.name ? ` (${item.item_sizes.name})` : '';
+            const quantity = item.quantity || 1;
+            const unitPrice = item.unit_price || 0;
+            const itemTotal = unitPrice * quantity;
+            
+            return `
             <div style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 12px;">
-              <span>${item.quantity}x ${item.food_items?.name || 'Unknown Item'}${item.item_sizes?.name ? ` (${item.item_sizes.name})` : ''}</span>
-              <span>${formatCurrency(item.unit_price * item.quantity)}</span>
+              <span>${quantity}x ${itemName}${sizeName}</span>
+              <span>${formatCurrency(itemTotal)}</span>
             </div>
-          `).join('')}
+          `;
+          }).join('')}
           <div style="border-top: 1px solid #000; margin-top: 10px; padding-top: 5px;">
             <div style="display: flex; justify-content: space-between; font-weight: bold;">
               <span>TOTAL:</span>
@@ -179,6 +192,7 @@ const KioskOrderSuccessPage = () => {
         </div>
       `;
     } else {
+      console.log('🖨️ No order items found in receipt');
       orderItemsHTML = `
         <div style="border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 10px 0; margin: 20px 0;">
           <p style="text-align: center; font-weight: bold; margin: 0;">ORDER DETAILS</p>
