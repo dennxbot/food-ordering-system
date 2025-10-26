@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useOrders } from '../../hooks/useOrders';
@@ -42,6 +42,17 @@ const OrderDetails = () => {
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [cancellationInfo, setCancellationInfo] = useState<any>(null);
+  
+  // Refs for timeout cleanup
+  const timeoutRefs = useRef<Set<NodeJS.Timeout>>(new Set());
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      timeoutRefs.current.forEach(timeout => clearTimeout(timeout));
+      timeoutRefs.current.clear();
+    };
+  }, []);
 
   useEffect(() => {
     // Don't do anything while auth is loading
@@ -672,18 +683,27 @@ const OrderDetails = () => {
                             setCancelReason('');
                             setToastMessage('Order cancelled successfully');
                             setShowSuccessToast(true);
-                            setTimeout(() => setShowSuccessToast(false), 5000); // Hide after 5 seconds
                             
-                            // Reload the page to show updated order status
-                            setTimeout(() => {
+                            // Store timeout IDs for cleanup
+                            const successTimeout = setTimeout(() => setShowSuccessToast(false), 5000);
+                            const reloadTimeout = setTimeout(() => {
                               window.location.reload();
-                            }, 1000); // Small delay to show the success message
+                            }, 1000);
+                            
+                            // Add to cleanup set
+                            timeoutRefs.current.add(successTimeout);
+                            timeoutRefs.current.add(reloadTimeout);
                           } catch (error: any) {
                             const errorMsg = error.message || 'Failed to cancel order';
                             setCancelError(errorMsg);
                             setToastMessage(errorMsg);
                             setShowErrorToast(true);
-                            setTimeout(() => setShowErrorToast(false), 5000); // Hide after 5 seconds
+                            
+                            // Store timeout ID for cleanup
+                            const errorTimeout = setTimeout(() => setShowErrorToast(false), 5000);
+                            
+                            // Add to cleanup set
+                            timeoutRefs.current.add(errorTimeout);
                           } finally {
                             setCancelLoading(false);
                           }
