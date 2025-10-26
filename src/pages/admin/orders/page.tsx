@@ -104,20 +104,7 @@ const AdminOrders = () => {
     try {
       setLoading(true);
 
-      // Test Supabase connection first
-      console.log('📋 Admin Orders: Testing Supabase connection...');
-      const { data: testData, error: testError } = await supabase
-        .from('orders')
-        .select('count')
-        .limit(1);
-      
-      if (testError) {
-        console.error('❌ Supabase connection test failed:', testError);
-        throw new Error(`Supabase connection failed: ${testError.message}`);
-      }
-      console.log('✅ Supabase connection test passed');
-
-      // Fetch regular orders
+      // Fetch regular orders (connection test skipped for performance)
       console.log('📋 Admin Orders: Fetching regular orders...');
       const regularOrdersStartTime = Date.now();
       

@@ -54,18 +54,7 @@ export const usePOSReports = () => {
     setError(null);
 
     try {
-      // Test Supabase connection first
-      console.log('📊 POS Reports: Testing Supabase connection...');
-      const { data: testData, error: testError } = await supabase
-        .from('orders')
-        .select('count')
-        .limit(1);
-      
-      if (testError) {
-        console.error('❌ Supabase connection test failed:', testError);
-        throw new Error(`Supabase connection failed: ${testError.message}`);
-      }
-      console.log('✅ Supabase connection test passed');
+      // Skip connection test for better performance
 
       // Set user context for RLS
       await supabase.rpc('set_user_context', { 

@@ -92,22 +92,7 @@ export const useCart = () => {
     }, 10000); // 10 second timeout (increased from 5s)
 
     try {
-      console.log('🔍 Querying database for user:', user.id);
-      
-      // Test Supabase connection first
-      console.log('🔍 useCart: Testing Supabase connection...');
-      const { data: testData, error: testError } = await supabase
-        .from('cart_items')
-        .select('count')
-        .limit(1);
-      
-      if (testError) {
-        console.error('❌ Supabase connection test failed:', testError);
-        throw new Error(`Supabase connection failed: ${testError.message}`);
-      }
-      console.log('✅ Supabase connection test passed');
-      
-      const cartStartTime = Date.now();
+      // Skip connection test - directly fetch data for better performance
       const { data: cartData, error } = await supabase
         .from('cart_items')
         .select(`
@@ -132,8 +117,6 @@ export const useCart = () => {
           )
         `)
         .eq('user_id', user.id);
-      const cartEndTime = Date.now();
-      console.log(`🔍 Cart query took: ${cartEndTime - cartStartTime}ms`);
 
       if (error) {
         console.error('❌ Cart query error:', error);

@@ -55,27 +55,7 @@ export const useFoodItems = () => {
     try {
       setIsLoading(true);
 
-      // Test Supabase connection first with timeout
-      console.log('🍽️ useFoodItems: Testing Supabase connection...');
-      const connectionTestPromise = supabase
-        .from('food_items')
-        .select('count')
-        .limit(1);
-      
-      const connectionTimeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Connection test timeout')), 5000)
-      );
-      
-      const { data: testData, error: testError } = await Promise.race([
-        connectionTestPromise,
-        connectionTimeoutPromise
-      ]) as any;
-      
-      if (testError) {
-        console.error('❌ Supabase connection test failed:', testError);
-        throw new Error(`Supabase connection failed: ${testError.message}`);
-      }
-      console.log('✅ Supabase connection test passed');
+      // Skip connection test for better performance
 
       // Fetch categories with timeout
       console.log('🍽️ useFoodItems: Fetching categories...');

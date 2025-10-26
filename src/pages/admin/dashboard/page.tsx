@@ -53,20 +53,7 @@ const AdminDashboard = () => {
     try {
       setLoading(true);
 
-      // Test Supabase connection first
-      console.log('📊 Admin Dashboard: Testing Supabase connection...');
-      const { data: testData, error: testError } = await supabase
-        .from('orders')
-        .select('count')
-        .limit(1);
-      
-      if (testError) {
-        console.error('❌ Supabase connection test failed:', testError);
-        throw new Error(`Supabase connection failed: ${testError.message}`);
-      }
-      console.log('✅ Supabase connection test passed');
-
-      // Fetch regular orders data with timeout
+      // Fetch regular orders data directly (connection test skipped for performance)
       console.log('📊 Admin Dashboard: Fetching regular orders...');
       const ordersStartTime = Date.now();
       
