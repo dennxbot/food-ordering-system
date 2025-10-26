@@ -82,28 +82,39 @@ const KioskOrderSuccessPage = () => {
         const enrichedItems = await Promise.all(
           (itemsData || []).map(async (item: any) => {
             // Get food item name
-            const { data: foodItem } = await supabase
+            const { data: foodItem, error: foodItemError } = await supabase
               .from('food_items')
               .select('name')
               .eq('id', item.food_item_id)
               .single();
 
+            if (foodItemError) {
+              console.error('❌ Error fetching food item:', foodItemError);
+            }
+
             // Get size name if size_id exists
             let sizeName = null;
             if (item.size_id) {
-              const { data: sizeItem } = await supabase
+              const { data: sizeItem, error: sizeError } = await supabase
                 .from('item_sizes')
                 .select('name')
                 .eq('id', item.size_id)
                 .single();
+              
+              if (sizeError) {
+                console.error('❌ Error fetching size:', sizeError);
+              }
               sizeName = sizeItem?.name;
             }
 
-            return {
+            const enrichedItem = {
               ...item,
-              food_items: foodItem,
+              food_items: foodItem || { name: 'Unknown Item' },
               item_sizes: sizeName ? { name: sizeName } : null
             };
+
+            console.log('📦 Enriched item:', enrichedItem);
+            return enrichedItem;
           })
         );
 
@@ -157,6 +168,15 @@ const KioskOrderSuccessPage = () => {
       itemsCount: orderData?.kiosk_order_items?.length || 0,
       items: orderData?.kiosk_order_items
     });
+    
+    // Debug: Log the actual structure
+    console.log('🖨️ Full orderData structure:', JSON.stringify(orderData, null, 2));
+    console.log('🖨️ Order items:', orderData?.kiosk_order_items);
+    if (orderData?.kiosk_order_items && orderData.kiosk_order_items.length > 0) {
+      console.log('🖨️ First item structure:', orderData.kiosk_order_items[0]);
+      console.log('🖨️ First item food_items:', orderData.kiosk_order_items[0]?.food_items);
+      console.log('🖨️ First item item_sizes:', orderData.kiosk_order_items[0]?.item_sizes);
+    }
     
     // Create order items section for receipt
     let orderItemsHTML = '';
