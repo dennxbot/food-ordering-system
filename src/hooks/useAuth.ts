@@ -36,6 +36,8 @@ export const useAuth = () => {
   useEffect(() => {
     console.log('🚀 useAuth useEffect triggered');
     
+    let isMounted = true; // Prevent state updates on unmounted component
+    
     // Simple initialization
     const initializeAuth = async () => {
       try {
@@ -49,7 +51,7 @@ export const useAuth = () => {
               
               // Verify the session is still valid in Supabase
               const { data: { session } } = await supabase.auth.getSession();
-              if (session?.user?.id === parsedUser.id) {
+              if (session?.user?.id === parsedUser.id && isMounted) {
                 console.log('✅ Session verified, using cached user');
                 setUser(parsedUser);
                 setIsLoading(false);
@@ -70,14 +72,14 @@ export const useAuth = () => {
 
         // Check Supabase session
         const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
+        if (session?.user && isMounted) {
           const { data: userProfile } = await supabase
             .from('users')
             .select('*')
             .eq('id', session.user.id)
             .single();
 
-          if (userProfile) {
+          if (userProfile && isMounted) {
             console.log('✅ Found user profile:', userProfile.role);
             setUser(userProfile);
             localStorage.setItem('currentUser', JSON.stringify(userProfile));
@@ -88,16 +90,20 @@ export const useAuth = () => {
         }
 
         // No user found
-        console.log('❌ No user found, initializing as guest');
-        setUser(null);
-        setIsLoading(false);
-        setIsInitialized(true);
+        if (isMounted) {
+          console.log('❌ No user found, initializing as guest');
+          setUser(null);
+          setIsLoading(false);
+          setIsInitialized(true);
+        }
         
       } catch (error) {
         console.error('❌ Auth initialization error:', error);
-        setUser(null);
-        setIsLoading(false);
-        setIsInitialized(true);
+        if (isMounted) {
+          setUser(null);
+          setIsLoading(false);
+          setIsInitialized(true);
+        }
       }
     };
 
@@ -105,6 +111,8 @@ export const useAuth = () => {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!isMounted) return; // Prevent updates on unmounted component
+      
       if (event === 'SIGNED_OUT' || !session) {
         setUser(null);
         localStorage.removeItem('currentUser');
@@ -115,14 +123,17 @@ export const useAuth = () => {
           .eq('id', session.user.id)
           .single();
 
-        if (userProfile) {
+        if (userProfile && isMounted) {
           setUser(userProfile);
           localStorage.setItem('currentUser', JSON.stringify(userProfile));
         }
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, password: string): Promise<{ success: boolean; user?: UserProfile; error?: string }> => {

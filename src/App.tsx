@@ -2,6 +2,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { AppRoutes } from './router'
 import { Suspense, Component, type ReactNode } from 'react'
 import AppLayout from './components/layout/AppLayout'
+import { useKeepAlive } from './hooks/useKeepAlive'
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   constructor(props: { children: ReactNode }) {
@@ -51,6 +52,9 @@ const router = {
 };
 
 function AppContent() {
+  // Initialize keep-alive mechanism
+  useKeepAlive();
+
   return (
     <ErrorBoundary>
       <Suspense fallback={

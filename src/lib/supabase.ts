@@ -7,7 +7,56 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 10
+    }
+  }
+});
+
+// Connection monitoring and auto-reconnection
+let connectionCheckInterval: NodeJS.Timeout | null = null;
+let isConnected = true;
+
+export const startConnectionMonitoring = () => {
+  if (connectionCheckInterval) return;
+  
+  connectionCheckInterval = setInterval(async () => {
+    try {
+      const { data, error } = await supabase.from('users').select('count').limit(1);
+      if (error) {
+        console.warn('🔌 Supabase connection lost, attempting reconnection...');
+        isConnected = false;
+        // Trigger reconnection by refreshing auth
+        await supabase.auth.refreshSession();
+      } else if (!isConnected) {
+        console.log('✅ Supabase connection restored');
+        isConnected = true;
+      }
+    } catch (error) {
+      console.warn('🔌 Connection check failed:', error);
+      isConnected = false;
+    }
+  }, 30000); // Check every 30 seconds
+};
+
+export const stopConnectionMonitoring = () => {
+  if (connectionCheckInterval) {
+    clearInterval(connectionCheckInterval);
+    connectionCheckInterval = null;
+  }
+};
+
+// Start monitoring on module load
+if (typeof window !== 'undefined') {
+  startConnectionMonitoring();
+}
 
 export type Database = {
   public: {
