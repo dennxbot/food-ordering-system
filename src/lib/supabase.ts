@@ -153,10 +153,12 @@ export type Database = {
           customer_address: string | null;
           order_type: 'delivery' | 'pickup' | 'pos';
           payment_method: 'cash' | 'card' | 'online';
-          status: 'pending' | 'preparing' | 'ready' | 'out_for_delivery' | 'completed' | 'cancelled';
+          payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
+          status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'completed' | 'cancelled';
           total_amount: number;
           order_source: 'online' | 'kiosk' | 'pos';
           notes: string | null;
+          estimated_ready_time: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -169,10 +171,12 @@ export type Database = {
           customer_address?: string | null;
           order_type?: 'delivery' | 'pickup' | 'pos';
           payment_method?: 'cash' | 'card' | 'online';
-          status?: 'pending' | 'preparing' | 'ready' | 'out_for_delivery' | 'completed' | 'cancelled';
+          payment_status?: 'pending' | 'paid' | 'failed' | 'refunded';
+          status?: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'completed' | 'cancelled';
           total_amount: number;
           order_source?: 'online' | 'kiosk' | 'pos';
           notes?: string | null;
+          estimated_ready_time?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -185,10 +189,12 @@ export type Database = {
           customer_address?: string | null;
           order_type?: 'delivery' | 'pickup' | 'pos';
           payment_method?: 'cash' | 'card' | 'online';
-          status?: 'pending' | 'preparing' | 'ready' | 'out_for_delivery' | 'completed' | 'cancelled';
+          payment_status?: 'pending' | 'paid' | 'failed' | 'refunded';
+          status?: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'completed' | 'cancelled';
           total_amount?: number;
           order_source?: 'online' | 'kiosk' | 'pos';
           notes?: string | null;
+          estimated_ready_time?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -228,6 +234,7 @@ export type Database = {
           quantity: number;
           unit_price: number;
           total_price: number;
+          special_instructions: string | null;
           created_at: string;
         };
         Insert: {
@@ -238,6 +245,7 @@ export type Database = {
           quantity: number;
           unit_price: number;
           total_price: number;
+          special_instructions?: string | null;
           created_at?: string;
         };
         Update: {
@@ -248,6 +256,33 @@ export type Database = {
           quantity?: number;
           unit_price?: number;
           total_price?: number;
+          special_instructions?: string | null;
+          created_at?: string;
+        };
+      };
+      order_status_history: {
+        Row: {
+          id: string;
+          order_id: string;
+          status: string;
+          changed_by: string | null;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          status: string;
+          changed_by?: string | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          order_id?: string;
+          status?: string;
+          changed_by?: string | null;
+          notes?: string | null;
           created_at?: string;
         };
       };

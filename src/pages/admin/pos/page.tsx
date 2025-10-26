@@ -189,7 +189,9 @@ const AdminPOS = () => {
       const order = await createOrder(
         orderItems,
         paymentMethod as 'cash' | 'card',
-        calculateTotal()
+        calculateTotal(),
+        undefined, // customerName - can be added later if needed
+        undefined  // customerPhone - can be added later if needed
       );
 
       setLastOrderId(order.order_number);

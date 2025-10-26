@@ -14,18 +14,52 @@ interface UserProfile {
   updated_at: string;
 }
 
+// Clean up any corrupted localStorage data on module load
+if (typeof window !== 'undefined') {
+  try {
+    const storedUser = localStorage.getItem('currentUser');
+    if (storedUser) {
+      JSON.parse(storedUser); // Test if it's valid JSON
+    }
+  } catch (error) {
+    console.warn('🧹 Cleaning corrupted localStorage data');
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('rememberEmail');
+  }
+}
+
 export const useAuth = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    // Initialize auth state from Supabase session
+    console.log('🚀 useAuth useEffect triggered');
+    
+    // Simple initialization
     const initializeAuth = async () => {
       try {
+        // Check localStorage first
+        const storedUser = localStorage.getItem('currentUser');
+        if (storedUser) {
+          try {
+            const parsedUser = JSON.parse(storedUser);
+            if (parsedUser.id && parsedUser.email && parsedUser.role) {
+              console.log('✅ Found stored user:', parsedUser.role);
+              setUser(parsedUser);
+              setIsLoading(false);
+              setIsInitialized(true);
+              return;
+            }
+          } catch (error) {
+            console.warn('🧹 Cleaning corrupted user data');
+            localStorage.removeItem('currentUser');
+          }
+        }
+
+        // Check Supabase session
         const { data: { session } } = await supabase.auth.getSession();
-        
         if (session?.user) {
-          // Get user profile from users table
           const { data: userProfile } = await supabase
             .from('users')
             .select('*')
@@ -33,26 +67,26 @@ export const useAuth = () => {
             .single();
 
           if (userProfile) {
+            console.log('✅ Found user profile:', userProfile.role);
             setUser(userProfile);
             localStorage.setItem('currentUser', JSON.stringify(userProfile));
-          }
-        } else {
-          // Check if user is logged in from localStorage (fallback)
-          const storedUser = localStorage.getItem('currentUser');
-          if (storedUser) {
-            try {
-              const parsedUser = JSON.parse(storedUser);
-              setUser(parsedUser);
-            } catch (error) {
-              console.error('Error parsing stored user:', error);
-              localStorage.removeItem('currentUser');
-            }
+            setIsLoading(false);
+            setIsInitialized(true);
+            return;
           }
         }
-      } catch (error) {
-        console.error('Error initializing auth:', error);
-      } finally {
+
+        // No user found
+        console.log('❌ No user found, initializing as guest');
+        setUser(null);
         setIsLoading(false);
+        setIsInitialized(true);
+        
+      } catch (error) {
+        console.error('❌ Auth initialization error:', error);
+        setUser(null);
+        setIsLoading(false);
+        setIsInitialized(true);
       }
     };
 
@@ -64,7 +98,6 @@ export const useAuth = () => {
         setUser(null);
         localStorage.removeItem('currentUser');
       } else if (event === 'SIGNED_IN' && session?.user) {
-        // Get user profile when signed in
         const { data: userProfile } = await supabase
           .from('users')
           .select('*')
@@ -87,15 +120,14 @@ export const useAuth = () => {
       
       // Use Supabase Auth for authentication
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim(),
         password,
       });
 
       if (authError || !authData.user) {
-        console.error('Supabase auth error:', authError);
         return {
           success: false,
-          error: authError?.message || 'Invalid email or credentials. Please check your credentials.'
+          error: authError?.message || 'Invalid email or password. Please check your credentials.'
         };
       }
 
@@ -107,27 +139,11 @@ export const useAuth = () => {
         .single();
 
       if (profileError || !userProfile) {
-        // If user doesn't exist in users table, create a basic profile
-        const { data: newProfile, error: createError } = await supabase
-          .from('users')
-          .insert({
-            id: authData.user.id,
-            email: authData.user.email!,
-            full_name: authData.user.user_metadata?.full_name || 'User',
-            role: 'customer'
-          })
-          .select()
-          .single();
-
-        if (createError || !newProfile) {
-          await supabase.auth.signOut();
-          return {
-            success: false,
-            error: 'Failed to create user profile. Please contact support.'
-          };
-        }
-
-        userProfile = newProfile;
+        await supabase.auth.signOut();
+        return {
+          success: false,
+          error: 'User profile not found. Please contact support.'
+        };
       }
 
       // Check if kiosk user is trying to login from unauthorized URL
@@ -137,7 +153,7 @@ export const useAuth = () => {
           await supabase.auth.signOut();
           return {
             success: false,
-            error: 'Kiosk accounts can only be accessed from the kiosk login page. Please use the designated kiosk terminal.'
+            error: 'Kiosk accounts can only be accessed from the kiosk login page.'
           };
         }
       }
@@ -147,11 +163,10 @@ export const useAuth = () => {
       setUser(userProfile);
 
       return { success: true, user: userProfile };
-    } catch (error: any) {
-      console.error('Login error:', error);
+    } catch (error) {
       return {
         success: false,
-        error: 'An unexpected error occurred'
+        error: 'An unexpected error occurred. Please try again.'
       };
     } finally {
       setIsLoading(false);
@@ -240,7 +255,18 @@ export const useAuth = () => {
   const logout = async () => {
     await supabase.auth.signOut();
     localStorage.removeItem('currentUser');
+    localStorage.removeItem('rememberEmail');
     setUser(null);
+  };
+
+  // Emergency reset function to clear all auth data
+  const resetAuth = (): void => {
+    console.warn('🚨 Emergency auth reset triggered');
+    setUser(null);
+    setIsLoading(false);
+    setIsInitialized(true);
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('rememberEmail');
   };
 
   const updateProfile = async (updatedData: Partial<UserProfile>) => {
@@ -294,14 +320,16 @@ export const useAuth = () => {
   return {
     user,
     profile: user,
-    isLoading,
+    isLoading: isLoading || !isInitialized,
     login,
     signup,
     logout,
+    resetAuth,
     updateProfile,
     changePassword,
-    isAuthenticated: !!user,
+    isAuthenticated: !!user && isInitialized,
     isAdmin: user?.role === 'admin',
     isKiosk: user?.role === 'kiosk',
+    isInitialized,
   };
 };

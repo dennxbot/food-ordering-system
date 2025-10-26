@@ -45,7 +45,7 @@ export default function Home() {
       name: item.name,
       description: item.description || '',
       price: item.price,
-      image_url: item.image_url || `https://readdy.ai/api/search-image?query=delicious%20$%7Bitem.name%7D%20food%20photography%20with%20simple%20clean%20background&width=400&height=300&seq=${item.id}&orientation=landscape`,
+      image_url: item.image_url || `https://readdy.ai/api/search-image?query=delicious%20${encodeURIComponent(item.name)}%20food%20photography%20with%20simple%20clean%20background&width=400&height=300&seq=${item.id}&orientation=landscape`,
       category_id: item.category_id,
       is_available: item.is_available,
       is_featured: item.is_featured,
@@ -171,7 +171,7 @@ export default function Home() {
               >
                 <div className="aspect-[4/3] overflow-hidden relative">
                   <img
-                    src={category.image_url || `https://readdy.ai/api/search-image?query=delicious%20$%7Bcategory.name%7D%20food%20category%20with%20appetizing%20presentation%2C%20restaurant%20quality%20photography%2C%20clean%20background&width=400&height=300&seq=${category.id}&orientation=landscape`}
+                    src={category.image_url || `https://readdy.ai/api/search-image?query=delicious%20${encodeURIComponent(category.name)}%20food%20category%20with%20appetizing%20presentation%2C%20restaurant%20quality%20photography%2C%20clean%20background&width=400&height=300&seq=${category.id}&orientation=landscape`}
                     alt={category.name}
                     className="w-full h-full object-cover object-top group-hover:scale-110 transition-transform duration-500"
                   />
@@ -208,10 +208,11 @@ export default function Home() {
                     name: item.name,
                     description: item.description || '',
                     price: item.price,
-                    image_url: item.image_url || `https://readdy.ai/api/search-image?query=delicious%20$%7Bitem.name%7D%20food%20photography%20with%20simple%20clean%20background&width=400&height=300&seq=${item.id}&orientation=landscape`,
+                    image_url: item.image_url || `https://readdy.ai/api/search-image?query=delicious%20${encodeURIComponent(item.name)}%20food%20photography%20with%20simple%20clean%20background&width=400&height=300&seq=${item.id}&orientation=landscape`,
                     category_id: item.category_id,
                     is_featured: item.is_featured,
                     is_available: item.is_available,
+                    has_sizes: item.has_sizes || false,
                     preparation_time: item.preparation_time
                   }}
                   onAddToCart={handleAddToCart}

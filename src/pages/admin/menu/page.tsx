@@ -6,7 +6,6 @@ import { useAuth } from '../../../hooks/useAuth';
 import { supabase } from '../../../lib/supabase';
 import Button from '../../../components/base/Button';
 import Input from '../../../components/base/Input';
-import AdminSidebar from '../../../components/feature/AdminSidebar';
 import SizeManager from '../../../components/feature/SizeManager';
 
 interface MenuItem {
@@ -120,7 +119,7 @@ const AdminMenu = () => {
     }
 
     try {
-      const imageUrl = newItem.image_url || `https://readdy.ai/api/search-image?query=delicious%20$%7BnewItem.name%7D%20food%20photography%20with%20simple%20clean%20background%2C%20professional%20food%20styling%2C%20appetizing%20presentation&width=400&height=300&seq=${Date.now()}&orientation=landscape`;
+      const imageUrl = newItem.image_url || `https://readdy.ai/api/search-image?query=delicious%20${encodeURIComponent(newItem.name)}%20food%20photography%20with%20simple%20clean%20background%2C%20professional%20food%20styling%2C%20appetizing%20presentation&width=400&height=300&seq=${Date.now()}&orientation=landscape`;
 
       const { data, error } = await supabase
         .from('food_items')
@@ -312,10 +311,7 @@ const AdminMenu = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      <AdminSidebar />
-      
-      <div className="flex-1 ml-64">
+    <div>
         <div className="bg-white shadow-sm border-b border-gray-200">
           <div className="px-6 py-4">
             <div className="flex items-center justify-between">
@@ -638,7 +634,6 @@ const AdminMenu = () => {
             </div>
           )}
         </div>
-      </div>
     </div>
   );
 };

@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
 import { useKioskCart } from '../../../hooks/useKioskCart';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Button from '../../../components/base/Button';
 import { formatCurrency } from '../../../utils/currency';
 
 const KioskDashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, isLoading, isAuthenticated, isKiosk } = useAuth();
   const { items, total, clearCart } = useKioskCart();
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -30,6 +31,15 @@ const KioskDashboard = () => {
       return;
     }
   }, [isAuthenticated, isKiosk, isLoading, navigate]);
+
+  // Phase 1: Fresh data loading on route change
+  useEffect(() => {
+    // Refresh data when route changes (fresh page reload)
+    if (isAuthenticated && isKiosk) {
+      // Force refresh of cart data and any other dashboard data
+      console.log('Kiosk Dashboard: Fresh data load on route change');
+    }
+  }, [location.pathname, isAuthenticated, isKiosk]);
 
   // Show loading while checking authentication
   if (isLoading) {

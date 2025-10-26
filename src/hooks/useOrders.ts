@@ -41,9 +41,6 @@ interface OrderStatusHistory {
   changed_by: string | null;
   notes: string | null;
   created_at: string;
-  users?: {
-    full_name: string;
-  };
 }
 
 interface OrderWithItems extends Order {
@@ -57,6 +54,12 @@ export const useOrders = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchOrders = useCallback(async () => {
+    // Add timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.warn('Orders fetch timeout - setting loading to false');
+      setIsLoading(false);
+    }, 20000); // 20 second timeout (increased from 15s)
+
     try {
       setIsLoading(true);
 
@@ -68,7 +71,8 @@ export const useOrders = () => {
         });
       }
 
-      const { data, error } = await supabase
+      // Try to fetch orders with status history, fallback to without if it fails
+      let { data, error } = await supabase
         .from('orders')
         .select(`
           *,
@@ -80,20 +84,47 @@ export const useOrders = () => {
             )
           ),
           order_status_history (
-            *,
-            users (
-              full_name
-            )
+            id,
+            order_id,
+            status,
+            changed_by,
+            notes,
+            created_at
           )
         `)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      // If the query fails due to relationship issues, try without order_status_history
+      if (error && error.code === 'PGRST200' && error.message.includes('order_status_history')) {
+        console.warn('Order status history relationship not found, fetching without it');
+        const fallbackResult = await supabase
+          .from('orders')
+          .select(`
+            *,
+            order_items (
+              *,
+              food_items (
+                name,
+                image_url
+              )
+            )
+          `)
+          .order('created_at', { ascending: false });
+        
+        data = fallbackResult.data;
+        error = fallbackResult.error;
+      }
+
+      if (error) {
+        console.error('Error fetching orders:', error);
+        throw error;
+      }
       setOrders(data || []);
 
     } catch (error) {
       console.error('Error fetching orders:', error);
     } finally {
+      clearTimeout(timeoutId);
       setIsLoading(false);
     }
   }, [user]);
@@ -103,15 +134,22 @@ export const useOrders = () => {
   const CACHE_DURATION = 30000; // 30 seconds
 
   const fetchUserOrders = useCallback(async (userId: string) => {
+    // Add timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.warn('User orders fetch timeout');
+    }, 20000); // 20 second timeout (increased from 15s)
+
     try {
       // Check cache first
       const now = Date.now();
       const cached = ordersCache.current[userId];
       if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+        clearTimeout(timeoutId);
         return cached.data;
       }
 
-      const { data, error } = await supabase
+      // Try to fetch orders with status history, fallback to without if it fails
+      let { data, error } = await supabase
         .from('orders')
         .select(`
           *,
@@ -123,16 +161,43 @@ export const useOrders = () => {
             )
           ),
           order_status_history (
-            *,
-            users (
-              full_name
-            )
+            id,
+            order_id,
+            status,
+            changed_by,
+            notes,
+            created_at
           )
         `)
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      // If the query fails due to relationship issues, try without order_status_history
+      if (error && error.code === 'PGRST200' && error.message.includes('order_status_history')) {
+        console.warn('Order status history relationship not found, fetching without it');
+        const fallbackResult = await supabase
+          .from('orders')
+          .select(`
+            *,
+            order_items (
+              *,
+              food_items (
+                name,
+                image_url
+              )
+            )
+          `)
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
+        
+        data = fallbackResult.data;
+        error = fallbackResult.error;
+      }
+
+      if (error) {
+        console.error('Error fetching user orders:', error);
+        throw error;
+      }
       
       // Update cache
       const orderData = data || [];
@@ -145,6 +210,8 @@ export const useOrders = () => {
     } catch (error) {
       console.error('Error fetching user orders:', error);
       return [];
+    } finally {
+      clearTimeout(timeoutId);
     }
   }, [user]);
 
@@ -239,7 +306,8 @@ export const useOrders = () => {
         });
       }
 
-      const { data, error } = await supabase
+      // Try to fetch order with status history, fallback to without if it fails
+      let { data, error } = await supabase
         .from('orders')
         .select(`
           *,
@@ -251,14 +319,38 @@ export const useOrders = () => {
             )
           ),
           order_status_history (
-            *,
-            users (
-              full_name
-            )
+            id,
+            order_id,
+            status,
+            changed_by,
+            notes,
+            created_at
           )
         `)
         .eq('id', orderId)
         .single();
+
+      // If the query fails due to relationship issues, try without order_status_history
+      if (error && error.code === 'PGRST200' && error.message.includes('order_status_history')) {
+        console.warn('Order status history relationship not found, fetching without it');
+        const fallbackResult = await supabase
+          .from('orders')
+          .select(`
+            *,
+            order_items (
+              *,
+              food_items (
+                name,
+                image_url
+              )
+            )
+          `)
+          .eq('id', orderId)
+          .single();
+        
+        data = fallbackResult.data;
+        error = fallbackResult.error;
+      }
 
       if (error) {
         console.error('❌ Error fetching order:', error);
@@ -364,7 +456,7 @@ export const useOrders = () => {
         .rpc('cancel_order', { 
           p_order_id: orderId,
           p_reason: reason,
-          p_cancelled_by: user?.id
+          p_cancelled_by: user?.id?.toString() || 'customer'
         });
 
       if (updateError) throw updateError;

@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import Button from '../../../components/base/Button';
 import Input from '../../../components/base/Input';
-import AdminSidebar from '../../../components/feature/AdminSidebar';
 
 interface ProfileData {
   full_name: string;
@@ -196,10 +195,7 @@ const AdminSettings = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      <AdminSidebar />
-      
-      <div className="flex-1 ml-64">
+    <div>
         {/* Header */}
         <div className="bg-white shadow-sm border-b border-gray-200">
           <div className="px-6 py-4">
@@ -449,7 +445,6 @@ const AdminSettings = () => {
             </div>
           </div>
         </div>
-      </div>
     </div>
   );
 };

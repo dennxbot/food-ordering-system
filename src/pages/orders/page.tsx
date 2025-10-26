@@ -162,6 +162,42 @@ const Orders = () => {
                   </div>
                 </div>
 
+                {/* Payment Status - Don't show for cancelled orders */}
+                {order.payment_status && order.status !== 'cancelled' && (
+                  <div className="mb-4 p-3 bg-gray-50 rounded-xl">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        order.payment_status === 'paid' ? 'bg-green-100' :
+                        order.payment_status === 'pending' ? 'bg-yellow-100' :
+                        order.payment_status === 'failed' ? 'bg-red-100' :
+                        'bg-gray-100'
+                      }`}>
+                        <i className={`${
+                          order.payment_status === 'paid' ? 'ri-check-line text-green-600' :
+                          order.payment_status === 'pending' ? 'ri-time-line text-yellow-600' :
+                          order.payment_status === 'failed' ? 'ri-close-line text-red-600' :
+                          'ri-question-line text-gray-600'
+                        }`}></i>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Payment</p>
+                        <p className={`text-sm font-medium ${
+                          order.payment_status === 'paid' ? 'text-green-900' :
+                          order.payment_status === 'pending' ? 'text-yellow-900' :
+                          order.payment_status === 'failed' ? 'text-red-900' :
+                          'text-gray-900'
+                        }`}>
+                          {order.payment_status === 'paid' ? 'Paid' :
+                           order.payment_status === 'pending' ? 
+                             (order.payment_method === 'cash' ? 'Pay on Pickup' : 'Payment Pending') :
+                           order.payment_status === 'failed' ? 'Payment Failed' :
+                           order.payment_status}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Order Items */}
                 <div className="space-y-3 mb-4">
                   {order.order_items?.map((item: any, index: number) => (
@@ -179,7 +215,7 @@ const Orders = () => {
                           <span>{item.quantity}x</span>
                           <span>{formatCurrency(item.unit_price)}</span>
                           <span className="text-gray-400">•</span>
-                          <span>{formatCurrency(item.total_price)}</span>
+                          <span>{formatCurrency(item.quantity * item.unit_price)}</span>
                         </div>
                       </div>
                     </div>

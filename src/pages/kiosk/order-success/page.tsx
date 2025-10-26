@@ -16,36 +16,114 @@ const KioskOrderSuccessPage = () => {
   const orderId = location.state?.orderId;
   const orderNumber = orderId ? orderId.slice(-4) : Math.floor(Math.random() * 10000) + 1000;
 
+  // Phase 1: Fresh data loading on route change
+  useEffect(() => {
+    // Refresh data when route changes (fresh page reload)
+    console.log('Kiosk Order Success: Fresh data load on route change');
+  }, [location.pathname]);
+
   // Fetch order data
   useEffect(() => {
     const fetchOrderData = async () => {
+      console.log('🛒 Kiosk Order Success: Starting to fetch order data', {
+        orderId,
+        hasOrderId: !!orderId
+      });
+      
       if (!orderId) {
+        console.log('❌ Kiosk Order Success: No order ID provided');
         setIsLoading(false);
         return;
       }
 
       try {
-        const { data, error } = await supabase
-          .from('orders')
-          .select(`
-            *,
-            order_items (
-              id,
-              quantity,
-              unit_price,
-              size_id,
-              food_item:food_items (
-                name
-              ),
-              item_sizes (
-                name
-              )
-            )
-          `)
+        // First, get the kiosk order
+        const { data: orderData, error: orderError } = await supabase
+          .from('kiosk_orders')
+          .select('*')
           .eq('id', orderId)
           .single();
 
-        if (error) throw error;
+        if (orderError) {
+          console.error('❌ Kiosk Order Success: Error fetching kiosk order:', orderError);
+          throw orderError;
+        }
+        
+        console.log('🛒 Kiosk Order Success: Kiosk order fetched', {
+          orderData,
+          hasOrderData: !!orderData
+        });
+
+        // Then, get the order items separately
+        const { data: itemsData, error: itemsError } = await supabase
+          .from('kiosk_order_items')
+          .select(`
+            id,
+            quantity,
+            unit_price,
+            size_id,
+            food_item_id
+          `)
+          .eq('kiosk_order_id', orderId);
+
+        if (itemsError) {
+          console.error('❌ Error fetching kiosk order items:', itemsError);
+          throw itemsError;
+        }
+
+        console.log('🛒 Kiosk Order Success: Raw items data', {
+          itemsData,
+          itemsCount: itemsData?.length || 0,
+          orderId,
+          queryError: itemsError
+        });
+
+        // Get food item names separately
+        const enrichedItems = await Promise.all(
+          (itemsData || []).map(async (item: any) => {
+            // Get food item name
+            const { data: foodItem } = await supabase
+              .from('food_items')
+              .select('name')
+              .eq('id', item.food_item_id)
+              .single();
+
+            // Get size name if size_id exists
+            let sizeName = null;
+            if (item.size_id) {
+              const { data: sizeItem } = await supabase
+                .from('item_sizes')
+                .select('name')
+                .eq('id', item.size_id)
+                .single();
+              sizeName = sizeItem?.name;
+            }
+
+            return {
+              ...item,
+              food_items: foodItem,
+              item_sizes: sizeName ? { name: sizeName } : null
+            };
+          })
+        );
+
+        // Combine the data
+        const data = {
+          ...orderData,
+          kiosk_order_items: enrichedItems || []
+        };
+        
+        console.log('🛒 Kiosk Order Success: Final enriched data', {
+          enrichedItems,
+          enrichedItemsCount: enrichedItems?.length || 0,
+          finalData: data
+        });
+        console.log('🛒 Kiosk Order Success: Order data fetched', {
+          orderId,
+          orderData: data,
+          hasItems: data?.kiosk_order_items?.length > 0,
+          itemsCount: data?.kiosk_order_items?.length || 0
+        });
         setOrderData(data);
       } catch (error) {
         console.error('Error fetching order data:', error);
@@ -73,15 +151,22 @@ const KioskOrderSuccessPage = () => {
   }, [navigate]);
 
   const handlePrintOrder = () => {
+    console.log('🖨️ Kiosk Order Success: Printing order', {
+      orderData,
+      hasItems: orderData?.kiosk_order_items?.length > 0,
+      itemsCount: orderData?.kiosk_order_items?.length || 0,
+      items: orderData?.kiosk_order_items
+    });
+    
     // Create order items section for receipt
     let orderItemsHTML = '';
-    if (orderData && orderData.order_items && orderData.order_items.length > 0) {
+    if (orderData && orderData.kiosk_order_items && orderData.kiosk_order_items.length > 0) {
       orderItemsHTML = `
         <div style="margin: 20px 0;">
           <p style="font-weight: bold; margin-bottom: 10px;">ORDER ITEMS:</p>
-          ${orderData.order_items.map((item: any) => `
+          ${orderData.kiosk_order_items.map((item: any) => `
             <div style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 12px;">
-              <span>${item.quantity}x ${item.food_item?.name}${item.item_sizes?.name ? ` (${item.item_sizes.name})` : ''}</span>
+              <span>${item.quantity}x ${item.food_items?.name || 'Unknown Item'}${item.item_sizes?.name ? ` (${item.item_sizes.name})` : ''}</span>
               <span>${formatCurrency(item.unit_price * item.quantity)}</span>
             </div>
           `).join('')}
@@ -200,16 +285,16 @@ const KioskOrderSuccessPage = () => {
           </div>
 
           {/* Order Items Section */}
-          {!isLoading && orderData && orderData.order_items && orderData.order_items.length > 0 && (
+          {!isLoading && orderData && orderData.kiosk_order_items && orderData.kiosk_order_items.length > 0 && (
             <div className="mb-6">
               <h3 className="text-xl font-semibold text-gray-800 mb-4">Order Items</h3>
               <div className="bg-gray-50 rounded-lg p-4">
                 <div className="space-y-3">
-                  {orderData.order_items.map((item: any, index: number) => (
+                  {orderData.kiosk_order_items.map((item: any, index: number) => (
                     <div key={item.id || index} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-b-0">
                       <div className="flex-1">
                         <span className="font-medium text-gray-900">
-                          {item.quantity}x {item.food_item?.name}
+                          {item.quantity}x {item.food_items?.name || 'Unknown Item'}
                           {item.item_sizes?.name && (
                             <span className="text-gray-600"> ({item.item_sizes.name})</span>
                           )}

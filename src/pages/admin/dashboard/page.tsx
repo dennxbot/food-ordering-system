@@ -5,11 +5,10 @@ import { formatCurrency } from '../../../utils/currency';
 import { useAuth } from '../../../hooks/useAuth';
 import { supabase } from '../../../lib/supabase';
 import Button from '../../../components/base/Button';
-import AdminSidebar from '../../../components/feature/AdminSidebar';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const { user, isLoading, isAuthenticated, isAdmin } = useAuth();
+  const { user, isLoading, isAuthenticated, isAdmin, logout } = useAuth();
   const [stats, setStats] = useState({
     totalOrders: 0,
     pendingOrders: 0,
@@ -38,16 +37,98 @@ const AdminDashboard = () => {
   }, [isAuthenticated, isAdmin, isLoading, navigate]);
 
   const fetchDashboardData = async () => {
+    console.log('📊 Admin Dashboard: Starting data fetch...', {
+      timestamp: new Date().toISOString()
+    });
+    
+    // Add timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.warn('Admin Dashboard fetch timeout - setting loading to false', {
+        timestamp: new Date().toISOString(),
+        duration: '20s'
+      });
+      setLoading(false);
+    }, 20000); // 20 second timeout
+
     try {
       setLoading(true);
 
-      // Fetch orders data
-      const { data: orders, error: ordersError } = await supabase
+      // Test Supabase connection first
+      console.log('📊 Admin Dashboard: Testing Supabase connection...');
+      const { data: testData, error: testError } = await supabase
+        .from('orders')
+        .select('count')
+        .limit(1);
+      
+      if (testError) {
+        console.error('❌ Supabase connection test failed:', testError);
+        throw new Error(`Supabase connection failed: ${testError.message}`);
+      }
+      console.log('✅ Supabase connection test passed');
+
+      // Fetch regular orders data with timeout
+      console.log('📊 Admin Dashboard: Fetching regular orders...');
+      const ordersStartTime = Date.now();
+      
+      const ordersPromise = supabase
         .from('orders')
         .select('*')
         .order('created_at', { ascending: false });
+      
+      const ordersTimeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Orders query timeout')), 10000)
+      );
+      
+      const { data: orders, error: ordersError } = await Promise.race([
+        ordersPromise,
+        ordersTimeoutPromise
+      ]) as any;
+      
+      const ordersEndTime = Date.now();
+      console.log(`📊 Regular orders query took: ${ordersEndTime - ordersStartTime}ms`);
 
       if (ordersError) throw ordersError;
+
+      // Fetch kiosk orders data with timeout
+      console.log('📊 Admin Dashboard: Fetching kiosk orders...');
+      const kioskOrdersStartTime = Date.now();
+      
+      const kioskOrdersPromise = supabase
+        .from('kiosk_orders')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      const kioskOrdersTimeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Kiosk orders query timeout')), 10000)
+      );
+      
+      const { data: kioskOrders, error: kioskOrdersError } = await Promise.race([
+        kioskOrdersPromise,
+        kioskOrdersTimeoutPromise
+      ]) as any;
+      
+      const kioskOrdersEndTime = Date.now();
+      console.log(`📊 Kiosk orders query took: ${kioskOrdersEndTime - kioskOrdersStartTime}ms`);
+
+      if (kioskOrdersError) throw kioskOrdersError;
+
+      // Combine and normalize all orders
+      const allOrders = [
+        ...(orders || []).map(order => ({
+          ...order,
+          order_source: order.order_source || 'online'
+        })),
+        ...(kioskOrders || []).map(order => ({
+          ...order,
+          order_source: 'kiosk'
+        }))
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      console.log('🛒 Admin Dashboard: Fetched orders data', {
+        regularOrders: orders?.length || 0,
+        kioskOrders: kioskOrders?.length || 0,
+        totalOrders: allOrders.length
+      });
 
       // Fetch food items count
       const { data: foodItems, error: foodItemsError } = await supabase
@@ -60,28 +141,28 @@ const AdminDashboard = () => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const todayOrders = orders?.filter(order => 
+      const todayOrders = allOrders?.filter(order => 
         new Date(order.created_at) >= today
       ) || [];
 
-      const pendingOrders = orders?.filter(order => 
+      const pendingOrders = allOrders?.filter(order => 
         order.status === 'pending' || order.status === 'preparing'
       ) || [];
 
-      const completedOrders = orders?.filter(order => 
+      const completedOrders = allOrders?.filter(order => 
         order.status === 'completed'
       ) || [];
 
-      const totalRevenue = orders?.reduce((sum, order) => 
-        sum + parseFloat(order.total_amount || 0), 0
+      const totalRevenue = allOrders?.reduce((sum, order) => 
+        sum + (order.status !== 'cancelled' ? parseFloat(order.total_amount || 0) : 0), 0
       ) || 0;
 
       const todaySales = todayOrders.reduce((sum, order) => 
-        sum + parseFloat(order.total_amount || 0), 0
+        sum + (order.status !== 'cancelled' ? parseFloat(order.total_amount || 0) : 0), 0
       );
 
       setStats({
-        totalOrders: orders?.length || 0,
+        totalOrders: allOrders?.length || 0,
         pendingOrders: pendingOrders.length,
         totalRevenue,
         totalMenuItems: foodItems?.length || 0,
@@ -91,10 +172,10 @@ const AdminDashboard = () => {
       });
 
       // Set recent orders (last 5)
-      setRecentOrders(orders?.slice(0, 5) || []);
+      setRecentOrders(allOrders?.slice(0, 5) || []);
 
       // Generate notifications based on recent orders
-      const recentNotifications = orders?.slice(0, 3).map((order, index) => ({
+      const recentNotifications = allOrders?.slice(0, 3).map((order, index) => ({
         id: order.id,
         type: order.status === 'pending' ? 'new_order' : 'order_update',
         message: order.status === 'pending' 
@@ -109,7 +190,10 @@ const AdminDashboard = () => {
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
+      // Always clear loading state and timeout
+      clearTimeout(timeoutId);
       setLoading(false);
+      console.log('📊 Admin Dashboard: Data fetch completed');
     }
   };
 
@@ -201,10 +285,7 @@ const AdminDashboard = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      <AdminSidebar />
-      
-      <div className="flex-1 ml-64">
+    <div>
         {/* Header */}
         <div className="bg-white shadow-sm border-b border-gray-200">
           <div className="px-6 py-4">
@@ -300,6 +381,7 @@ const AdminDashboard = () => {
         </div>
 
         <div className="p-6">
+        {/* Dashboard Content */}
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl shadow-sm p-6 border border-blue-200 hover:shadow-md transition-all duration-300">
@@ -453,46 +535,44 @@ const AdminDashboard = () => {
                 </div>
               </div>
             </div>
-
-            {/* Notifications Panel */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-6">Recent Activity</h2>
-              <div className="space-y-4">
-                {notifications.slice(0, 5).map((notification) => (
-                  <div
-                    key={notification.id}
-                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                      notification.unread
-                        ? 'bg-orange-50 border-orange-200'
-                        : 'bg-gray-50 border-gray-200'
-                    }`}
-                    onClick={() => markNotificationRead(notification.id)}
-                  >
-                    <div className="flex items-start">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${
-                        notification.type === 'new_order' ? 'bg-green-100' : 'bg-blue-100'
-                      }`}>
-                        <i className={`${
-                          notification.type === 'new_order' ? 'ri-shopping-bag-line text-green-600' : 'ri-refresh-line text-blue-600'
-                        } text-sm`}></i>
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">{notification.message}</p>
-                        <p className="text-xs text-gray-600">{notification.time}</p>
-                      </div>
-                      {notification.unread && (
-                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                      )}
+          {/* Notifications Panel */}
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-6">Recent Activity</h2>
+            <div className="space-y-4">
+              {notifications.slice(0, 5).map((notification) => (
+                <div
+                  key={notification.id}
+                  className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                    notification.unread
+                      ? 'bg-orange-50 border-orange-200'
+                      : 'bg-gray-50 border-gray-200'
+                  }`}
+                  onClick={() => markNotificationRead(notification.id)}
+                >
+                  <div className="flex items-start">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${
+                      notification.type === 'new_order' ? 'bg-green-100' : 'bg-blue-100'
+                    }`}>
+                      <i className={`${
+                        notification.type === 'new_order' ? 'ri-shopping-bag-line text-green-600' : 'ri-refresh-line text-blue-600'
+                      } text-sm`}></i>
                     </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900">{notification.message}</p>
+                      <p className="text-xs text-gray-600">{notification.time}</p>
+                    </div>
+                    {notification.unread && (
+                      <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                    )}
                   </div>
-                ))}
-                {notifications.length === 0 && (
-                  <div className="text-center text-gray-500 py-8">
-                    <i className="ri-notification-off-line text-2xl mb-2"></i>
-                    <p className="text-sm">No recent activity</p>
-                  </div>
-                )}
-              </div>
+                </div>
+              ))}
+              {notifications.length === 0 && (
+                <div className="text-center text-gray-500 py-8">
+                  <i className="ri-notification-off-line text-2xl mb-2"></i>
+                  <p className="text-sm">No recent activity</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

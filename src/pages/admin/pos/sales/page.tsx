@@ -51,17 +51,20 @@ const POSSales = () => {
   useEffect(() => {
     const fetchSalesData = async () => {
       try {
+        console.log('🔍 Fetching sales data for user:', user?.id, 'role:', user?.role);
         const data = await getSalesReport(new Date(startDate), new Date(endDate));
+        console.log('✅ Sales data fetched successfully:', data);
         setSalesData(data || []);
       } catch (error) {
-        console.error('Failed to fetch sales data:', error);
+        console.error('❌ Failed to fetch sales data:', error);
+        // Don't set error state here, let the hook handle it
       }
     };
 
-    if (user?.role === 'admin') {
+    if (user?.role === 'admin' && !authLoading) {
       fetchSalesData();
     }
-  }, [user, startDate, endDate, getSalesReport]);
+  }, [user, authLoading, startDate, endDate, getSalesReport]);
 
   const totalSales = salesData.reduce((sum, day) => sum + (day.total_sales || 0), 0);
   const totalOrders = salesData.reduce((sum, day) => sum + (day.total_orders || 0), 0);

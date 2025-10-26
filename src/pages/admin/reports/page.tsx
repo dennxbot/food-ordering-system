@@ -1,11 +1,10 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { supabase } from '../../../lib/supabase';
 import { formatCurrency } from '../../../utils/currency';
 import Button from '../../../components/base/Button';
-import AdminSidebar from '../../../components/feature/AdminSidebar';
 
 interface ReportData {
   totalOrders: number;
@@ -186,7 +185,12 @@ const AdminReports = () => {
         .lt('created_at', end)
         .order('created_at', { ascending: false });
 
-      if (ordersError) throw ordersError;
+      if (ordersError) {
+        console.error('POS orders query error:', ordersError);
+        throw ordersError;
+      }
+
+      console.log('POS orders fetched successfully:', orders?.length || 0, 'orders');
 
       // Format the data for CSV
       const csvRows = [
@@ -197,24 +201,44 @@ const AdminReports = () => {
 
       // Process each order and its items separately
       orders.forEach((order: any) => {
-        // For each item in the order, create a separate row
-        order.pos_order_items.forEach((item: any) => {
+        // Check if order has items
+        if (order.pos_order_items && Array.isArray(order.pos_order_items)) {
+          // For each item in the order, create a separate row
+          order.pos_order_items.forEach((item: any) => {
+            const date = new Date(order.created_at).toLocaleDateString();
+            const orderNumber = `Order #${order.order_number}`;
+            const itemName = item.food_items?.name || 'Unknown Item';
+            const itemText = `${item.quantity}x ${itemName}`;
+            const paymentMethod = order.payment_method === 'cash' ? 'Cash' : 'Card';
+            const amount = item.total_price || (item.quantity * item.unit_price);
+            
+            overallTotal += amount;
+
+            csvRows.push([
+              date,
+              orderNumber,
+              itemText,
+              paymentMethod,
+              `₱${amount.toFixed(2)}`
+            ]);
+          });
+        } else {
+          // Handle orders without items
           const date = new Date(order.created_at).toLocaleDateString();
           const orderNumber = `Order #${order.order_number}`;
-          const itemText = `${item.quantity}x ${item.food_items.name}`;
           const paymentMethod = order.payment_method === 'cash' ? 'Cash' : 'Card';
-          const amount = item.total_price || (item.quantity * item.unit_price);
+          const amount = order.total_amount || 0;
           
           overallTotal += amount;
 
           csvRows.push([
             date,
             orderNumber,
-            itemText,
+            'No items found',
             paymentMethod,
             `₱${amount.toFixed(2)}`
           ]);
-        });
+        }
       });
 
       // Add empty row and overall total
@@ -289,7 +313,6 @@ const AdminReports = () => {
           order_items (
             quantity,
             unit_price,
-            total_price,
             food_items (
               name
             )
@@ -321,7 +344,7 @@ const AdminReports = () => {
           const paymentMethod = order.payment_method === 'cash'
             ? (order.order_type === 'delivery' ? 'Cash on Delivery' : 'Pay on Pickup')
             : 'Card';
-          const total = item.total_price || (item.quantity * item.unit_price);
+          const total = item.quantity * item.unit_price;
           
           overallTotal += total;
 
@@ -480,23 +503,17 @@ const AdminReports = () => {
 
   if (isLoadingData || !reportData) {
     return (
-      <div className="min-h-screen bg-gray-50 flex">
-        <AdminSidebar />
-        <div className="flex-1 ml-64 flex items-center justify-center">
-          <div className="text-center">
-            <i className="ri-loader-4-line text-4xl text-orange-600 animate-spin mb-4"></i>
-            <p className="text-gray-600">Loading reports...</p>
-          </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <i className="ri-loader-4-line text-4xl text-orange-600 animate-spin mb-4"></i>
+          <p className="text-gray-600">Loading reports...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      <AdminSidebar />
-      
-      <div className="flex-1 ml-64">
+    <div>
         <div className="bg-white shadow-sm border-b border-gray-200">
           <div className="px-6 py-4">
             <div className="flex items-center justify-between">
@@ -835,6 +852,7 @@ const AdminReports = () => {
                         <>
                           {/* Online Sales Area */}
                           <path
+                            key="online-sales-area"
                             d={`
                               M 0 ${100 - (reportData.dailySales[0].online_sales / Math.max(...reportData.dailySales.map(d => d.sales))) * 100}
                               ${reportData.dailySales.map((day, i) => 
@@ -848,6 +866,7 @@ const AdminReports = () => {
                           />
                           {/* Online Sales Line */}
                           <path
+                            key="online-sales-line"
                             d={`
                               M 0 ${100 - (reportData.dailySales[0].online_sales / Math.max(...reportData.dailySales.map(d => d.sales))) * 100}
                               ${reportData.dailySales.map((day, i) => 
@@ -861,6 +880,7 @@ const AdminReports = () => {
 
                           {/* POS Sales Area */}
                           <path
+                            key="pos-sales-area"
                             d={`
                               M 0 ${100 - (reportData.dailySales[0].pos_sales / Math.max(...reportData.dailySales.map(d => d.sales))) * 100}
                               ${reportData.dailySales.map((day, i) => 
@@ -874,6 +894,7 @@ const AdminReports = () => {
                           />
                           {/* POS Sales Line */}
                           <path
+                            key="pos-sales-line"
                             d={`
                               M 0 ${100 - (reportData.dailySales[0].pos_sales / Math.max(...reportData.dailySales.map(d => d.sales))) * 100}
                               ${reportData.dailySales.map((day, i) => 
@@ -887,10 +908,9 @@ const AdminReports = () => {
 
                           {/* Data points */}
                           {reportData.dailySales.map((day, i) => (
-                            <>
+                            <Fragment key={`data-points-${i}`}>
                               {/* Online Sales Point */}
                               <circle
-                                key={`online-${i}`}
                                 cx={i}
                                 cy={100 - (day.online_sales / Math.max(...reportData.dailySales.map(d => d.sales))) * 100}
                                 r="3"
@@ -901,7 +921,6 @@ const AdminReports = () => {
                               />
                               {/* POS Sales Point */}
                               <circle
-                                key={`pos-${i}`}
                                 cx={i}
                                 cy={100 - (day.pos_sales / Math.max(...reportData.dailySales.map(d => d.sales))) * 100}
                                 r="3"
@@ -910,7 +929,7 @@ const AdminReports = () => {
                                 strokeWidth="2"
                                 className="hover:r-4 transition-all duration-200"
                               />
-                            </>
+                            </Fragment>
                           ))}
                         </>
                       )}
@@ -947,7 +966,6 @@ const AdminReports = () => {
             )}
           </div>
         </div>
-      </div>
     </div>
   );
 };

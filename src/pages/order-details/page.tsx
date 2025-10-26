@@ -12,8 +12,20 @@ const CANCELLATION_REASONS = [
   { value: 'wrong_order', label: 'Ordered wrong items' },
   { value: 'long_wait', label: 'Wait time too long' },
   { value: 'duplicate', label: 'Duplicate order' },
-  { value: 'other', label: 'Other reason' }
+  { value: 'other', label: 'Other reason' },
+  // Admin-specific reasons
+  { value: 'no_payment', label: 'No payment received' },
+  { value: 'order_mistake', label: 'Order placed by mistake' },
+  { value: 'item_unavailable', label: 'Item unavailable' },
+  { value: 'customer_request', label: 'Customer requested cancellation' },
+  { value: 'system_error', label: 'System error' }
 ];
+
+// Helper function to get readable cancellation reason
+const getCancellationReasonLabel = (reason: string) => {
+  const reasonObj = CANCELLATION_REASONS.find(r => r.value === reason);
+  return reasonObj ? reasonObj.label : reason;
+};
 
 const OrderDetails = () => {
   const { id } = useParams();
@@ -90,6 +102,27 @@ const OrderDetails = () => {
   }, [id, user?.id, authLoading, navigate, getOrderById, order]);
 
   const getStatusSteps = () => {
+    // For cancelled orders, show a simplified status flow
+    if (order?.status === 'cancelled') {
+      return [
+        { 
+          key: 'pending', 
+          label: 'Order Placed', 
+          icon: 'ri-check-line',
+          completed: true,
+          active: false
+        },
+        { 
+          key: 'cancelled', 
+          label: 'Order Cancelled', 
+          icon: 'ri-close-circle-line',
+          completed: true,
+          active: true
+        }
+      ];
+    }
+
+    // For active orders, show the full status flow
     const steps = [
       { key: 'pending', label: 'Order Placed', icon: 'ri-check-line' },
       { key: 'preparing', label: 'Preparing', icon: 'ri-restaurant-line' },
@@ -99,7 +132,11 @@ const OrderDetails = () => {
     ];
 
     const statusOrder = ['pending', 'preparing', 'ready', 'out_for_delivery', 'completed'];
-    const currentIndex = statusOrder.indexOf(order?.status || 'pending');
+    let currentIndex = statusOrder.indexOf(order?.status || 'pending');
+    
+    // Note: We allow the order status to show the actual database status
+    // even for unpaid cash orders, as admin may manually update status
+    // Payment requirements are shown separately in the UI
 
     return steps.map((step, index) => ({
       ...step,
@@ -244,10 +281,56 @@ const OrderDetails = () => {
                     <div className="flex-1">
                       <h4 className="font-semibold text-red-900 mb-1">Order Cancelled</h4>
                       <p className="text-red-800 text-sm mb-2">
-                        <strong>Reason:</strong> {cancellationInfo.reason}
+                        <strong>Reason:</strong> {getCancellationReasonLabel(cancellationInfo.reason)}
                       </p>
                       <p className="text-red-700 text-xs">
                         Cancelled on {new Date(cancellationInfo.created_at).toLocaleDateString()} at {new Date(cancellationInfo.created_at).toLocaleTimeString()}
+                        {cancellationInfo.cancelled_by && (
+                          <span className="ml-2">
+                            • {cancellationInfo.cancelled_by === order?.user_id ? 'Cancelled by you' : 'Cancelled by admin'}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Cancellation Notice - Show for cancelled orders */}
+              {order.status === 'cancelled' && (
+                <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <i className="ri-information-line text-gray-600"></i>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-gray-900 mb-1">Order Cancelled</h4>
+                      <p className="text-gray-700 text-sm">
+                        This order has been cancelled. No payment is required and the order will not be prepared.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Payment Pending Notice - Don't show for cancelled orders */}
+              {order.payment_status === 'pending' && order.payment_method === 'cash' && order.status !== 'cancelled' && (
+                <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <i className="ri-time-line text-yellow-600"></i>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-yellow-900 mb-1">
+                        {order.status === 'ready' ? 'Ready for Pickup - Payment Required' : 'Payment Pending'}
+                      </h4>
+                      <p className="text-yellow-800 text-sm">
+                        {order.order_type === 'pickup' 
+                          ? (order.status === 'ready' 
+                              ? 'Your order is ready! Please bring cash payment when you arrive.'
+                              : 'Please bring cash payment when you pick up your order.')
+                          : 'Payment will be collected upon delivery.'
+                        }
                       </p>
                     </div>
                   </div>
@@ -267,6 +350,15 @@ const OrderDetails = () => {
                       <p className={`font-semibold text-base ${step.completed || step.active ? 'text-gray-900' : 'text-gray-400'}`}>
                     {step.label}
                   </p>
+                  {/* Show payment requirement for unpaid cash orders (but not for cancelled orders) */}
+                  {order?.payment_method === 'cash' && order?.payment_status === 'pending' && order?.status !== 'cancelled' && (
+                    <p className="text-sm text-amber-600 mt-1">
+                      <i className="ri-money-dollar-circle-line mr-1"></i>
+                      {step.key === 'pending' ? 'Payment required before order can proceed' :
+                       step.key === 'ready' ? 'Payment required for pickup' :
+                       'Payment still pending'}
+                    </p>
+                  )}
                 </div>
                 {step.completed && (
                       <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
@@ -299,7 +391,7 @@ const OrderDetails = () => {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-gray-900">{formatCurrency(item.total_price)}</p>
+                      <p className="font-bold text-gray-900">{formatCurrency(item.quantity * item.unit_price)}</p>
                       <p className="text-xs text-gray-500 mt-1">
                         {item.quantity} × {formatCurrency(item.unit_price)}
                       </p>
@@ -402,7 +494,40 @@ const OrderDetails = () => {
                       </p>
                     </div>
             </div>
-          </div>
+                  </div>
+
+                  {/* Payment Status - Don't show for cancelled orders */}
+                  {order.payment_status && order.status !== 'cancelled' && (
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        order.payment_status === 'paid' ? 'bg-green-100' :
+                        order.payment_status === 'pending' ? 'bg-yellow-100' :
+                        order.payment_status === 'failed' ? 'bg-red-100' :
+                        'bg-gray-100'
+                      }`}>
+                        <i className={`${
+                          order.payment_status === 'paid' ? 'ri-check-line text-green-600' :
+                          order.payment_status === 'pending' ? 'ri-time-line text-yellow-600' :
+                          order.payment_status === 'failed' ? 'ri-close-line text-red-600' :
+                          'ri-question-line text-gray-600'
+                        }`}></i>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Payment Status</p>
+                        <p className={`font-medium capitalize ${
+                          order.payment_status === 'paid' ? 'text-green-900' :
+                          order.payment_status === 'pending' ? 'text-yellow-900' :
+                          order.payment_status === 'failed' ? 'text-red-900' :
+                          'text-gray-900'
+                        }`}>
+                          {order.payment_status === 'paid' ? 'Paid' :
+                           order.payment_status === 'pending' ? 'Payment Pending' :
+                           order.payment_status === 'failed' ? 'Payment Failed' :
+                           order.payment_status}
+                        </p>
+                      </div>
+                    </div>
+                  )}
         </div>
 
               {/* Order Actions */}
@@ -428,6 +553,51 @@ const OrderDetails = () => {
                           >
                             Cancel Order
                           </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Payment Instructions Card - Show for Pay on Pickup orders (but not for cancelled orders) */}
+                  {order.payment_method === 'cash' && order.payment_status === 'pending' && order.order_type === 'pickup' && order.status !== 'cancelled' && (
+                    <div className="bg-amber-50 rounded-2xl p-6 border border-amber-100">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+                          <i className="ri-money-dollar-circle-line text-2xl text-amber-600"></i>
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-amber-900 text-lg">
+                            {order.status === 'ready' ? 'Ready for Pickup - Payment Required' : 'Payment Required on Pickup'}
+                          </h4>
+                          <p className="text-amber-800 mt-1">
+                            Please bring <strong>{formatCurrency(order.total_amount)}</strong> in cash when you come to pick up your order.
+                          </p>
+                          <p className="text-amber-700 text-sm mt-2">
+                            {order.status === 'ready' 
+                              ? 'Your order is ready! Please bring payment when you arrive.'
+                              : 'Your order will be ready for pickup once payment is received.'
+                            }
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Order Status Info Card - Show when order is preparing and can't be cancelled */}
+                  {order.status === 'preparing' && user?.role !== 'admin' && (
+                    <div className="bg-blue-50 rounded-2xl p-6 border border-blue-100">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                          <i className="ri-chef-hat-line text-2xl text-blue-600"></i>
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-blue-900 text-lg">Kitchen is Preparing Your Order</h4>
+                          <p className="text-blue-800 mt-1">
+                            Your order is now being prepared by our kitchen team. Cancellation is no longer available as we've already started cooking your food.
+                          </p>
+                          <p className="text-blue-700 text-sm mt-2">
+                            If you have any concerns, please contact us directly.
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -503,6 +673,11 @@ const OrderDetails = () => {
                             setToastMessage('Order cancelled successfully');
                             setShowSuccessToast(true);
                             setTimeout(() => setShowSuccessToast(false), 5000); // Hide after 5 seconds
+                            
+                            // Reload the page to show updated order status
+                            setTimeout(() => {
+                              window.location.reload();
+                            }, 1000); // Small delay to show the success message
                           } catch (error: any) {
                             const errorMsg = error.message || 'Failed to cancel order';
                             setCancelError(errorMsg);

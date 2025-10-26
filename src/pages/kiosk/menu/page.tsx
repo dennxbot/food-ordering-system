@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useFoodItems } from '../../../hooks/useFoodItems';
 import { useKioskCart } from '../../../hooks/useKioskCart';
 import { useItemSizes } from '../../../hooks/useItemSizes';
@@ -32,18 +33,64 @@ interface Size {
 }
 
 const KioskMenuPage: React.FC = () => {
+  const location = useLocation();
   const { foodItems, categories, isLoading } = useFoodItems();
   const { addToCart, cart } = useKioskCart();
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [showSizeModal, setShowSizeModal] = useState(false);
   const [selectedItemForSize, setSelectedItemForSize] = useState<FoodItem | null>(null);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
   const { sizes: itemSizes } = useItemSizes(selectedItemForSize?.id);
 
   const filteredItems = selectedCategory === 'All' 
     ? foodItems 
     : foodItems.filter((item: FoodItem) => item.category?.name === selectedCategory);
 
+  console.log('🍽️ Kiosk Menu: Filtering items:', {
+    selectedCategory,
+    totalFoodItems: foodItems.length,
+    filteredItems: filteredItems.length,
+    categories: categories.map(c => c.name)
+  });
+
+  // Toast notification function
+  const showToastNotification = (message: string) => {
+    setToastMessage(message);
+    setShowToast(true);
+    setTimeout(() => {
+      setShowToast(false);
+    }, 3000); // Hide after 3 seconds
+  };
+
+  // Phase 1: Fresh data loading on route change
+  useEffect(() => {
+    // Refresh data when route changes (fresh page reload)
+    console.log('🍽️ Kiosk Menu: Fresh data load on route change');
+    console.log('🍽️ Kiosk Menu: Current data state:', { 
+      foodItems: foodItems.length, 
+      categories: categories.length, 
+      isLoading 
+    });
+    // Reset category selection on fresh load
+    setSelectedCategory('All');
+  }, [location.pathname, foodItems.length, categories.length, isLoading]);
+
+  // Monitor cart changes
+  useEffect(() => {
+    console.log('🛒 Kiosk Menu: Cart state changed', {
+      cartItems: cart.length,
+      totalQuantity: cart.reduce((total, item) => total + item.quantity, 0)
+    });
+  }, [cart]);
+
   const handleAddToCart = async (item: FoodItem) => {
+    console.log('🍽️ Kiosk Menu: Adding item to cart', {
+      itemName: item.name,
+      itemId: item.id,
+      hasSizes: item.has_sizes
+    });
+
     // Check if item has sizes and show modal
     if (item.has_sizes) {
       setSelectedItemForSize(item);
@@ -54,14 +101,24 @@ const KioskMenuPage: React.FC = () => {
     // Add item without size
     try {
       await addToCart({ ...item, has_sizes: item.has_sizes || false }, undefined, 1);
-      // Optional: Show success feedback
+      console.log('✅ Kiosk Menu: Item added to cart successfully');
+      
+      // Show success feedback
+      showToastNotification(`✅ ${item.name} added to cart!`);
     } catch (error) {
-      console.error('Failed to add item to cart:', error);
+      console.error('❌ Failed to add item to cart:', error);
       alert('Failed to add item to cart. Please try again.');
     }
   };
 
   const addItemWithSize = async (item: FoodItem, selectedSize?: Size) => {
+    console.log('🍽️ Kiosk Menu: Adding item with size to cart', {
+      itemName: item.name,
+      itemId: item.id,
+      sizeName: selectedSize?.name,
+      sizeId: selectedSize?.id
+    });
+
     try {
       await addToCart(
         { ...item, has_sizes: item.has_sizes || false },
@@ -70,14 +127,20 @@ const KioskMenuPage: React.FC = () => {
       );
       setShowSizeModal(false);
       setSelectedItemForSize(null);
-      // Optional: Show success feedback
+      
+      console.log('✅ Kiosk Menu: Item with size added to cart successfully');
+      
+      // Show success feedback
+      const sizeText = selectedSize ? ` (${selectedSize.name})` : '';
+      showToastNotification(`✅ ${item.name}${sizeText} added to cart!`);
     } catch (error) {
-      console.error('Failed to add item to cart:', error);
+      console.error('❌ Failed to add item to cart:', error);
       alert('Failed to add item to cart. Please try again.');
     }
   };
 
   if (isLoading) {
+    console.log('🍽️ Kiosk Menu: Still loading...');
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -87,6 +150,12 @@ const KioskMenuPage: React.FC = () => {
       </div>
     );
   }
+
+  console.log('🍽️ Kiosk Menu: Rendering with data:', { 
+    foodItems: foodItems.length, 
+    categories: categories.length, 
+    filteredItems: filteredItems.length 
+  });
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -130,8 +199,23 @@ const KioskMenuPage: React.FC = () => {
 
       {/* Menu Items */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredItems.map((item: FoodItem) => (
+        {filteredItems.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="text-6xl mb-4">🍽️</div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">No menu items available</h3>
+            <p className="text-gray-600">
+              {foodItems.length === 0 
+                ? "No food items found in the database. Please contact the administrator."
+                : `No items found in the "${selectedCategory}" category.`
+              }
+            </p>
+            <div className="mt-4 text-sm text-gray-500">
+              <p>Debug info: {foodItems.length} total items, {categories.length} categories</p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredItems.map((item: FoodItem) => (
             <div
               key={item.id}
               className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow"
@@ -176,17 +260,6 @@ const KioskMenuPage: React.FC = () => {
               </div>
             </div>
           ))}
-        </div>
-        
-        {filteredItems.length === 0 && (
-          <div className="text-center py-12">
-            <div className="text-6xl mb-4">🍽️</div>
-            <h3 className="text-2xl font-semibold text-gray-900 mb-2">
-              No items found
-            </h3>
-            <p className="text-gray-600">
-              Try selecting a different category or check back later.
-            </p>
           </div>
         )}
       </div>
@@ -249,6 +322,16 @@ const KioskMenuPage: React.FC = () => {
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {showToast && (
+        <div className="fixed top-4 right-4 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg animate-bounce">
+          <div className="flex items-center space-x-2">
+            <span className="text-xl">✅</span>
+            <span className="font-medium">{toastMessage}</span>
           </div>
         </div>
       )}

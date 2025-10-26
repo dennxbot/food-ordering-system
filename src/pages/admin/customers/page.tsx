@@ -5,7 +5,6 @@ import { formatCurrency } from '../../../utils/currency';
 import { useAuth } from '../../../hooks/useAuth';
 import { supabase } from '../../../lib/supabase';
 import Button from '../../../components/base/Button';
-import AdminSidebar from '../../../components/feature/AdminSidebar';
 
 interface Customer {
   id: string;
@@ -80,7 +79,9 @@ const AdminCustomers = () => {
       const customersWithStats = users?.map(user => {
         const userOrders = orders?.filter(order => order.user_id === user.id) || [];
         const totalOrders = userOrders.length;
-        const totalSpent = userOrders.reduce((sum, order) => sum + parseFloat(order.total_amount || '0'), 0);
+        // Exclude cancelled orders from revenue calculation
+        const totalSpent = userOrders.reduce((sum, order) => 
+          sum + (order.status !== 'cancelled' ? parseFloat(order.total_amount || '0') : 0), 0);
         const lastOrder = userOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
 
         return {
@@ -185,10 +186,7 @@ const AdminCustomers = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      <AdminSidebar />
-      
-      <div className="flex-1 ml-64">
+    <div>
         <div className="bg-white shadow-sm border-b border-gray-200">
           <div className="px-6 py-4">
             <h1 className="text-2xl font-bold text-gray-900">Customer Management</h1>
@@ -310,10 +308,11 @@ const AdminCustomers = () => {
                   <div>
                     <p className="text-sm font-medium text-orange-700 mb-1">Avg Order Value</p>
                     <p className="text-3xl font-bold text-orange-900">
-                      {customers.length > 0 && customers.reduce((sum, customer) => sum + customer.totalOrders, 0) > 0
-                        ? formatCurrency(customers.reduce((sum, customer) => sum + customer.totalSpent, 0) / 
-                           customers.reduce((sum, customer) => sum + customer.totalOrders, 0))
-                        : formatCurrency(0)}
+                      {(() => {
+                        const totalOrders = customers.reduce((sum, customer) => sum + customer.totalOrders, 0);
+                        const totalRevenue = customers.reduce((sum, customer) => sum + customer.totalSpent, 0);
+                        return totalOrders > 0 ? formatCurrency(totalRevenue / totalOrders) : formatCurrency(0);
+                      })()}
                     </p>
                     <p className="text-xs text-orange-600 mt-1">
                       <i className="ri-user-star-line mr-1"></i>
@@ -452,7 +451,6 @@ const AdminCustomers = () => {
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 };

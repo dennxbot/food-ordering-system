@@ -79,10 +79,18 @@ export const useKioskCart = () => {
     if (cartCache.current[user.id]) {
       console.log('📦 Using cached cart data');
       setItems(cartCache.current[user.id]);
+      return; // Don't proceed with database loading if we have cached data
     }
 
     loadingRef.current = true;
     setIsLoading(true);
+
+    // Add timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.warn('Kiosk cart loading timeout - setting loading to false');
+      loadingRef.current = false;
+      setIsLoading(false);
+    }, 20000); // 20 second timeout (increased from 15s)
 
     try {
       console.log('🔍 Querying database for user:', user.id);
@@ -119,6 +127,12 @@ export const useKioskCart = () => {
 
       const processedItems = processCartData(cartData || []);
       
+      console.log('🛒 useKioskCart: Processing cart data', {
+        rawData: cartData?.length || 0,
+        processedItems: processedItems.length,
+        sampleItem: processedItems[0]
+      });
+      
       // Update cache
       cartCache.current[user.id] = processedItems;
       
@@ -127,6 +141,7 @@ export const useKioskCart = () => {
     } catch (error) {
       console.error('❌ Error loading cart:', error);
     } finally {
+      clearTimeout(timeoutId);
       setIsLoading(false);
       loadingRef.current = false;
     }
@@ -134,6 +149,11 @@ export const useKioskCart = () => {
 
   // Load cart on mount and when user changes
   useEffect(() => {
+    console.log('🛒 useKioskCart: useEffect triggered', {
+      userId: user?.id,
+      currentItems: items.length
+    });
+    
     if (user?.id) {
       loadCartFromDatabase();
     } else {
@@ -148,33 +168,82 @@ export const useKioskCart = () => {
       return;
     }
 
+    // Prevent multiple rapid calls
+    if (isLoading) {
+      console.log('🛒 useKioskCart: Already processing, skipping add to cart');
+      return;
+    }
+
+    console.log('🛒 useKioskCart: Adding item to cart', {
+      foodItemId: foodItem.id,
+      foodItemName: foodItem.name,
+      sizeId,
+      quantity,
+      currentItems: items.length
+    });
+
     try {
       setIsLoading(true);
 
+      // Ensure sizeId is properly handled - convert undefined to null, but keep null as null
+      const actualSizeId = sizeId === undefined ? null : sizeId;
+
       // Check if item already exists in cart
       const existingItemIndex = items.findIndex(item => 
-        item.id === foodItem.id && item.size_id === (sizeId || null)
+        item.id === foodItem.id && item.size_id === actualSizeId
       );
 
       if (existingItemIndex >= 0) {
         // Update existing item
         const newQuantity = items[existingItemIndex].quantity + quantity;
-        await updateQuantity(items[existingItemIndex].id, newQuantity, sizeId);
+        await updateQuantity(items[existingItemIndex].id, newQuantity, actualSizeId);
       } else {
-        // Add new item
-        const { error } = await supabase
+        // Check if item already exists in database to prevent duplicates
+        let checkQuery = supabase
           .from('cart_items')
-          .insert({
-            user_id: user.id,
-            food_item_id: foodItem.id,
-            size_id: sizeId || null,
-            quantity
-          });
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('food_item_id', foodItem.id);
 
-        if (error) throw error;
+        // Handle size_id condition properly
+        if (actualSizeId === null) {
+          // For items without size, use filter() to check for NULL
+          checkQuery = checkQuery.filter('size_id', 'is', null);
+        } else {
+          // For items with size, use eq() to check for specific UUID
+          checkQuery = checkQuery.eq('size_id', actualSizeId);
+        }
 
-        // Reload cart to get updated data
-        await loadCartFromDatabase();
+        const { data: existingCartItem, error: checkError } = await checkQuery.single();
+
+        if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows returned
+          throw checkError;
+        }
+
+        if (existingCartItem) {
+          // Item exists in database, update quantity
+          const newQuantity = existingCartItem.quantity + quantity;
+          await updateQuantity(foodItem.id, newQuantity, actualSizeId);
+        } else {
+          // Add new item
+          const { error } = await supabase
+            .from('cart_items')
+            .insert({
+              user_id: user.id,
+              food_item_id: foodItem.id,
+              size_id: actualSizeId,
+              quantity
+            });
+
+          if (error) throw error;
+
+          console.log('🛒 useKioskCart: Item inserted successfully, reloading cart...');
+          
+          // Reload cart to get updated data
+          await loadCartFromDatabase();
+          
+          console.log('🛒 useKioskCart: Cart reloaded after adding item');
+        }
       }
     } catch (error) {
       console.error('❌ Error adding to cart:', error);
@@ -184,31 +253,124 @@ export const useKioskCart = () => {
     }
   };
 
-  const removeFromCart = async (foodItemId: string, sizeId?: string) => {
+  const updateQuantity = async (foodItemId: string, newQuantity: number, sizeId?: string) => {
     if (!user?.id) return;
+
+    console.log('🛒 useKioskCart: Updating quantity', {
+      foodItemId,
+      newQuantity,
+      sizeId,
+      currentItems: items.length
+    });
 
     try {
       setIsLoading(true);
 
-      const { error } = await supabase
+      // Build the query conditionally to handle null size_id properly
+      let query = supabase
         .from('cart_items')
-        .delete()
+        .update({ quantity: newQuantity })
         .eq('user_id', user.id)
-        .eq('food_item_id', foodItemId)
-        .eq('size_id', sizeId || null);
+        .eq('food_item_id', foodItemId);
+
+      // Handle size_id condition properly
+      if (sizeId === undefined || sizeId === null) {
+        // For items without size, use filter() to check for NULL
+        query = query.filter('size_id', 'is', null);
+      } else {
+        // For items with size, use eq() to check for specific UUID
+        query = query.eq('size_id', sizeId);
+      }
+
+      const { error } = await query;
 
       if (error) throw error;
 
       // Update local state immediately
-      setItems(prev => prev.filter(item => 
-        !(item.id === foodItemId && item.size_id === (sizeId || null))
-      ));
+      const actualSizeId = sizeId === undefined ? null : sizeId;
+      const newItems = items.map(item => 
+        item.id === foodItemId && item.size_id === actualSizeId
+          ? { ...item, quantity: newQuantity }
+          : item
+      );
+      
+      console.log('🛒 useKioskCart: Items after quantity update', {
+        before: items.length,
+        after: newItems.length,
+        updatedQuantity: newQuantity
+      });
+      
+      setItems(newItems);
+
+      // Update cache
+      if (cartCache.current[user.id]) {
+        cartCache.current[user.id] = cartCache.current[user.id].map(item => 
+          item.id === foodItemId && item.size_id === actualSizeId
+            ? { ...item, quantity: newQuantity }
+            : item
+        );
+        console.log('🛒 useKioskCart: Cache updated after quantity update');
+      }
+    } catch (error) {
+      console.error('❌ Error updating quantity:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const removeFromCart = async (foodItemId: string, sizeId?: string) => {
+    if (!user?.id) return;
+
+    console.log('🛒 useKioskCart: Removing item from cart', {
+      foodItemId,
+      sizeId,
+      currentItems: items.length
+    });
+
+    try {
+      setIsLoading(true);
+
+      // Build the query conditionally to handle null size_id properly
+      let query = supabase
+        .from('cart_items')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('food_item_id', foodItemId);
+
+      // Handle size_id condition properly
+      if (sizeId === undefined || sizeId === null) {
+        // For items without size, use filter() to check for NULL
+        query = query.filter('size_id', 'is', null);
+      } else {
+        // For items with size, use eq() to check for specific UUID
+        query = query.eq('size_id', sizeId);
+      }
+
+      const { error } = await query;
+
+      if (error) throw error;
+
+      // Update local state immediately
+      const actualSizeId = sizeId === undefined ? null : sizeId;
+      const newItems = items.filter(item => 
+        !(item.id === foodItemId && item.size_id === actualSizeId)
+      );
+      
+      console.log('🛒 useKioskCart: Items after removal', {
+        before: items.length,
+        after: newItems.length,
+        removed: items.length - newItems.length
+      });
+      
+      setItems(newItems);
 
       // Update cache
       if (cartCache.current[user.id]) {
         cartCache.current[user.id] = cartCache.current[user.id].filter(item => 
-          !(item.id === foodItemId && item.size_id === (sizeId || null))
+          !(item.id === foodItemId && item.size_id === actualSizeId)
         );
+        console.log('🛒 useKioskCart: Cache updated after removal');
       }
     } catch (error) {
       console.error('❌ Error removing from cart:', error);
@@ -218,48 +380,6 @@ export const useKioskCart = () => {
     }
   };
 
-  const updateQuantity = async (foodItemId: string, newQuantity: number, sizeId?: string) => {
-    if (!user?.id) return;
-
-    if (newQuantity <= 0) {
-      await removeFromCart(foodItemId, sizeId);
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-
-      const { error } = await supabase
-        .from('cart_items')
-        .update({ quantity: newQuantity })
-        .eq('user_id', user.id)
-        .eq('food_item_id', foodItemId)
-        .eq('size_id', sizeId || null);
-
-      if (error) throw error;
-
-      // Update local state immediately
-      setItems(prev => prev.map(item => 
-        item.id === foodItemId && item.size_id === (sizeId || null)
-          ? { ...item, quantity: newQuantity }
-          : item
-      ));
-
-      // Update cache
-      if (cartCache.current[user.id]) {
-        cartCache.current[user.id] = cartCache.current[user.id].map(item => 
-          item.id === foodItemId && item.size_id === (sizeId || null)
-            ? { ...item, quantity: newQuantity }
-            : item
-        );
-      }
-    } catch (error) {
-      console.error('❌ Error updating quantity:', error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const clearCart = async () => {
     if (!user?.id) return;
@@ -279,6 +399,7 @@ export const useKioskCart = () => {
       // Clear cache
       if (cartCache.current[user.id]) {
         delete cartCache.current[user.id];
+        console.log('🗑️ Kiosk cart cache cleared for user:', user.id);
       }
     } catch (error) {
       console.error('❌ Error clearing cart:', error);
@@ -314,28 +435,63 @@ export const useKioskCart = () => {
         throw new Error('Cart is empty');
       }
 
+      // Prepare items for RPC call
+      const rpcItems = items.map(item => ({
+        food_item_id: item.id,
+        size_id: (item.size_id && item.size_id !== 'undefined') ? item.size_id : null,
+        quantity: item.quantity,
+        unit_price: item.size_id ? (item.price + (item.size_price || 0)) : item.price
+      }));
+
+      console.log('🛒 useKioskCart: Creating kiosk order with items', {
+        itemsCount: items.length,
+        rpcItems,
+        orderData
+      });
+
       // Use the create_kiosk_order function
       const { data: order, error: orderError } = await supabase
         .rpc('create_kiosk_order', {
           p_customer_name: orderData.customerName,
-          p_customer_email: orderData.customerEmail || null,
+          p_items: rpcItems,
+          p_customer_email: orderData.customerEmail || 'N/A',
           p_customer_phone: orderData.customerPhone,
-          p_customer_address: orderData.customerAddress || null,
           p_order_type: orderData.orderType,
           p_payment_method: orderData.paymentMethod,
-          p_total_amount: getTotalPrice(),
           p_notes: orderData.notes || null,
-          p_kiosk_id: orderData.kioskId || null,
-          p_order_items: items.map(item => ({
-            food_item_id: item.id,
-            size_id: item.size_id,
-            quantity: item.quantity,
-            unit_price: item.size_id ? (item.price + (item.size_price || 0)) : item.price,
-            total_price: (item.size_id ? (item.price + (item.size_price || 0)) : item.price) * item.quantity
-          }))
+          p_kiosk_id: orderData.kioskId || null
         });
 
       if (orderError) throw orderError;
+
+      console.log('🛒 useKioskCart: Order created successfully', {
+        orderId: order,
+        orderData: orderData,
+        itemsCount: items.length,
+        items: items.map(item => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          size_id: item.size_id,
+          price: item.price
+        }))
+      });
+
+      // Verify that order items were actually inserted
+      const { data: insertedItems, error: itemsCheckError } = await supabase
+        .from('kiosk_order_items')
+        .select('*')
+        .eq('kiosk_order_id', order);
+
+      if (itemsCheckError) {
+        console.error('❌ Error checking inserted order items:', itemsCheckError);
+      } else {
+        console.log('🛒 useKioskCart: Order items verification', {
+          orderId: order,
+          insertedItemsCount: insertedItems?.length || 0,
+          insertedItems: insertedItems
+        });
+      }
 
       // Clear the cart after successful order creation
       await clearCart();

@@ -1,13 +1,30 @@
 import { Link, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { useCart } from '../../hooks/useCart';
+import { useKioskCart } from '../../hooks/useKioskCart';
 
 const KioskNavigation = () => {
   const { logout } = useAuth();
-  const { cart } = useCart();
+  const { cart } = useKioskCart();
   const location = useLocation();
 
   const cartItemCount = cart.reduce((total, item) => total + item.quantity, 0);
+
+  // Phase 1: Fresh data loading on route change
+  useEffect(() => {
+    console.log('🛒 KioskNavigation: Fresh data load on route change', {
+      pathname: location.pathname,
+      cartItems: cart.length,
+      totalQuantity: cartItemCount
+    });
+  }, [location.pathname, cart.length, cartItemCount]);
+
+  // Phase 1: Debug cart state changes
+  console.log('🛒 KioskNavigation: Cart state updated', {
+    cartItems: cart.length,
+    totalQuantity: cartItemCount,
+    location: location.pathname
+  });
 
   const navItems = [
     { path: '/kiosk', label: 'Home', icon: '🏠' },
@@ -20,7 +37,7 @@ const KioskNavigation = () => {
   };
 
   return (
-    <nav className="bg-white shadow-lg border-b-2 border-blue-600">
+    <nav className="bg-white shadow-lg border-b-2 border-blue-600" key={location.pathname}>
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex justify-between items-center h-20">
           {/* Logo/Brand */}

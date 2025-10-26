@@ -10,6 +10,7 @@ interface FoodItem {
   category_id: string | null;
   is_available: boolean;
   is_featured: boolean;
+  has_sizes: boolean;
   preparation_time: number;
 }
 
@@ -67,27 +68,53 @@ export default function FoodCard({ item, onAddToCart, onViewDetails }: FoodCardP
         </div>
       </div>
       <div className="px-6 pb-6">
-        <button
-          onClick={() => onAddToCart(item)}
-          disabled={!item.is_available}
-          className={`w-full py-3 px-4 rounded-xl font-semibold transition-all duration-300 whitespace-nowrap cursor-pointer ${
-            item.is_available 
-              ? 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white shadow-lg hover:shadow-xl transform hover:scale-105' 
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          }`}
-        >
-          {item.is_available ? (
-            <>
-              <i className="ri-shopping-cart-line mr-2" />
-              Add to Cart
-            </>
-          ) : (
-            <>
-              <i className="ri-close-circle-line mr-2" />
-              Out of Stock
-            </>
-          )}
-        </button>
+        {item.has_sizes ? (
+          // If item has sizes, show "Choose Size" button
+          <button
+            onClick={() => onViewDetails(item)}
+            disabled={!item.is_available}
+            className={`w-full py-3 px-4 rounded-xl font-semibold transition-all duration-300 whitespace-nowrap cursor-pointer ${
+              item.is_available 
+                ? 'bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white shadow-lg hover:shadow-xl transform hover:scale-105' 
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
+          >
+            {item.is_available ? (
+              <>
+                <i className="ri-settings-3-line mr-2" />
+                Choose Size
+              </>
+            ) : (
+              <>
+                <i className="ri-close-circle-line mr-2" />
+                Out of Stock
+              </>
+            )}
+          </button>
+        ) : (
+          // If item has no sizes, show "Add to Cart" button
+          <button
+            onClick={() => onAddToCart(item)}
+            disabled={!item.is_available}
+            className={`w-full py-3 px-4 rounded-xl font-semibold transition-all duration-300 whitespace-nowrap cursor-pointer ${
+              item.is_available 
+                ? 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white shadow-lg hover:shadow-xl transform hover:scale-105' 
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
+          >
+            {item.is_available ? (
+              <>
+                <i className="ri-shopping-cart-line mr-2" />
+                Add to Cart
+              </>
+            ) : (
+              <>
+                <i className="ri-close-circle-line mr-2" />
+                Out of Stock
+              </>
+            )}
+          </button>
+        )}
       </div>
     </div>
   );

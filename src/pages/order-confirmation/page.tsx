@@ -74,7 +74,6 @@ export default function OrderConfirmation() {
               size_id,
               quantity,
               unit_price,
-              total_price,
               food_items (
                 id,
                 name,
@@ -257,7 +256,7 @@ export default function OrderConfirmation() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-gray-900">${item.total_price.toFixed(2)}</p>
+                      <p className="font-bold text-gray-900">${(item.quantity * item.unit_price).toFixed(2)}</p>
                       <p className="text-xs text-gray-500 mt-1">
                         {item.quantity} × ${item.unit_price.toFixed(2)}
                       </p>

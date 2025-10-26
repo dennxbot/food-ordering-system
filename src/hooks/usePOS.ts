@@ -18,7 +18,9 @@ export const usePOS = () => {
   const createOrder = async (
     orderItems: POSOrderItem[],
     paymentMethod: 'cash' | 'card',
-    totalAmount: number
+    totalAmount: number,
+    customerName?: string,
+    customerPhone?: string
   ) => {
     if (!user) throw new Error('User not authenticated');
 
@@ -26,14 +28,19 @@ export const usePOS = () => {
     setError(null);
 
     try {
+      // Generate a unique order number
+      const orderNumber = `POS-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
       // Create the POS order directly without setting user context
       // The RLS policies will handle the permission check
       const { data: order, error: orderError } = await supabase
         .rpc('create_pos_order', {
           p_cashier_id: user.id,
+          p_order_number: orderNumber,
           p_payment_method: paymentMethod,
-          p_total_amount: totalAmount,
-          p_order_items: orderItems // Remove JSON.stringify - send as array directly
+          p_items: orderItems,
+          p_customer_name: customerName || null,
+          p_customer_phone: customerPhone || null
         });
 
       if (orderError) throw orderError;

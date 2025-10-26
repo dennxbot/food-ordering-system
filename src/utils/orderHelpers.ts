@@ -5,7 +5,7 @@ export const ORDER_CONFIG = {
   // Time window in minutes for order cancellation
   CANCELLATION_WINDOW: 15,
   // Statuses where cancellation is allowed
-  CANCELLABLE_STATUSES: ['pending', 'preparing'] as const,
+  CANCELLABLE_STATUSES: ['pending'] as const,
   // Maximum cancellations allowed per user per day
   MAX_CANCELLATIONS_PER_DAY: 3,
 };

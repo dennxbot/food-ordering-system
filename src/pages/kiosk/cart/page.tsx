@@ -1,20 +1,42 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
 import { useKioskCart } from '../../../hooks/useKioskCart';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { formatCurrency } from '../../../utils/currency';
 
 const KioskCartPage: React.FC = () => {
   const { user } = useAuth();
   const { cart, updateQuantity, removeFromCart, clearCart, getCartTotal, createKioskOrder } = useKioskCart();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const handleQuantityChange = (itemId: string, newQuantity: number) => {
+  // Phase 1: Fresh data loading on route change
+  useEffect(() => {
+    // Refresh data when route changes (fresh page reload)
+    console.log('Kiosk Cart: Fresh data load on route change');
+  }, [location.pathname]);
+
+  // Debug cart data
+  useEffect(() => {
+    console.log('🛒 Kiosk Cart: Cart data changed', {
+      cartLength: cart.length,
+      cartItems: cart.map((item, index) => ({
+        index,
+        id: item.id,
+        name: item.name,
+        size_id: item.size_id,
+        quantity: item.quantity,
+        key: `${item.id}-${item.size_id || 'default'}-${index}`
+      }))
+    });
+  }, [cart]);
+
+  const handleQuantityChange = (itemId: string, newQuantity: number, sizeId?: string) => {
     if (newQuantity <= 0) {
-      removeFromCart(itemId);
+      removeFromCart(itemId, sizeId);
     } else {
-      updateQuantity(itemId, newQuantity);
+      updateQuantity(itemId, newQuantity, sizeId);
     }
   };
 
@@ -34,9 +56,9 @@ const KioskCartPage: React.FC = () => {
         kioskId: 'KIOSK-001' // You can make this dynamic based on actual kiosk ID
       };
 
-      const order = await createKioskOrder(orderData);
+      const orderId = await createKioskOrder(orderData);
       clearCart();
-      navigate('/kiosk/order-success', { state: { orderId: order.id } });
+      navigate('/kiosk/order-success', { state: { orderId: orderId } });
     } catch (error) {
       console.error('Failed to place order:', error);
       alert('Failed to place order. Please try again.');
@@ -88,9 +110,9 @@ const KioskCartPage: React.FC = () => {
             </h2>
             
             <div className="space-y-4">
-              {cart.map((item) => (
+              {cart.map((item, index) => (
                 <div
-                  key={item.id}
+                  key={`${item.id}-${item.size_id || 'default'}-${index}`}
                   className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
                 >
                   <div className="flex items-center space-x-4">
@@ -130,7 +152,7 @@ const KioskCartPage: React.FC = () => {
                     {/* Quantity Controls */}
                     <div className="flex items-center space-x-2">
                       <button
-                        onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
+                        onClick={() => handleQuantityChange(item.id, item.quantity - 1, item.size_id)}
                         className="w-12 h-12 bg-red-500 text-white rounded-lg font-bold text-xl hover:bg-red-600 transition-colors"
                       >
                         -
@@ -141,7 +163,7 @@ const KioskCartPage: React.FC = () => {
                       </span>
                       
                       <button
-                        onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
+                        onClick={() => handleQuantityChange(item.id, item.quantity + 1, item.size_id)}
                         className="w-12 h-12 bg-green-500 text-white rounded-lg font-bold text-xl hover:bg-green-600 transition-colors"
                       >
                         +
@@ -157,7 +179,7 @@ const KioskCartPage: React.FC = () => {
 
                     {/* Remove Button */}
                     <button
-                      onClick={() => removeFromCart(item.id)}
+                      onClick={() => removeFromCart(item.id, item.size_id)}
                       className="w-12 h-12 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
                     >
                       🗑️

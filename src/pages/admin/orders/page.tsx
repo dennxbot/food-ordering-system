@@ -5,10 +5,31 @@ import { formatCurrency } from '../../../utils/currency';
 import { useAuth } from '../../../hooks/useAuth';
 import { supabase } from '../../../lib/supabase';
 import Button from '../../../components/base/Button';
-import AdminSidebar from '../../../components/feature/AdminSidebar';
+
+// Cancellation reasons mapping
+const CANCELLATION_REASONS = [
+  { value: 'changed_mind', label: 'Changed my mind' },
+  { value: 'wrong_order', label: 'Ordered wrong items' },
+  { value: 'long_wait', label: 'Wait time too long' },
+  { value: 'duplicate', label: 'Duplicate order' },
+  { value: 'other', label: 'Other reason' },
+  // Admin-specific reasons
+  { value: 'no_payment', label: 'No payment received' },
+  { value: 'order_mistake', label: 'Order placed by mistake' },
+  { value: 'item_unavailable', label: 'Item unavailable' },
+  { value: 'customer_request', label: 'Customer requested cancellation' },
+  { value: 'system_error', label: 'System error' }
+];
+
+// Helper function to get readable cancellation reason
+const getCancellationReasonLabel = (reason: string) => {
+  const reasonObj = CANCELLATION_REASONS.find(r => r.value === reason);
+  return reasonObj ? reasonObj.label : reason;
+};
 
 interface Order {
   id: string;
+  user_id: string;
   customer_name: string;
   customer_email: string;
   customer_phone: string;
@@ -31,6 +52,12 @@ interface Order {
     item_sizes?: {
       name: string;
     };
+  }[];
+  order_cancellations?: {
+    id: string;
+    reason: string;
+    cancelled_by: string;
+    created_at: string;
   }[];
 }
 
@@ -60,10 +87,41 @@ const AdminOrders = () => {
   }, [isAuthenticated, isAdmin, isLoading, navigate, sourceFilter]);
 
   const fetchOrders = async () => {
+    console.log('📋 Admin Orders: Starting data fetch...', {
+      timestamp: new Date().toISOString(),
+      sourceFilter
+    });
+    
+    // Add timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.warn('Admin Orders fetch timeout - setting loading to false', {
+        timestamp: new Date().toISOString(),
+        duration: '20s'
+      });
+      setLoading(false);
+    }, 20000); // 20 second timeout
+
     try {
       setLoading(true);
 
-      let query = supabase
+      // Test Supabase connection first
+      console.log('📋 Admin Orders: Testing Supabase connection...');
+      const { data: testData, error: testError } = await supabase
+        .from('orders')
+        .select('count')
+        .limit(1);
+      
+      if (testError) {
+        console.error('❌ Supabase connection test failed:', testError);
+        throw new Error(`Supabase connection failed: ${testError.message}`);
+      }
+      console.log('✅ Supabase connection test passed');
+
+      // Fetch regular orders
+      console.log('📋 Admin Orders: Fetching regular orders...');
+      const regularOrdersStartTime = Date.now();
+      
+      let ordersQuery = supabase
         .from('orders')
         .select(`
           *,
@@ -78,28 +136,133 @@ const AdminOrders = () => {
             item_sizes (
               name
             )
+          ),
+          order_cancellations (
+            id,
+            reason,
+            cancelled_by,
+            created_at
           )
         `)
         .order('created_at', { ascending: false });
 
-      // Apply source filter if not 'all'
-      if (sourceFilter !== 'all') {
-        query = query.eq('order_source', sourceFilter);
+      // Apply source filter for regular orders
+      if (sourceFilter === 'online' || sourceFilter === 'pos') {
+        ordersQuery = ordersQuery.eq('order_source', sourceFilter);
+      } else if (sourceFilter === 'kiosk') {
+        // For kiosk filter, we don't want regular orders at all
+        // We'll set regularOrdersData to empty array later
+      }
+      // For 'all' filter, we want all regular orders (no additional filtering needed)
+
+      // Fetch regular orders only if we need them
+      let regularOrdersData = [];
+      let ordersError = null;
+      
+      if (sourceFilter === 'all' || sourceFilter === 'online' || sourceFilter === 'pos') {
+        // Only fetch regular orders when we need them
+        const { data, error } = await ordersQuery;
+        regularOrdersData = data;
+        ordersError = error;
       }
 
-      const { data: ordersData, error } = await query;
+      // Fetch kiosk orders
+      let kioskOrdersQuery = supabase
+        .from('kiosk_orders')
+        .select(`
+          *,
+          kiosk_order_items (
+            id,
+            quantity,
+            unit_price,
+            size_id,
+            food_item:food_items (
+              name
+            ),
+            item_sizes (
+              name
+            )
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      // Fetch kiosk orders only if we need them
+      let kioskOrdersData = [];
+      let kioskOrdersError = null;
+      
+      if (sourceFilter === 'all' || sourceFilter === 'kiosk') {
+        // Only fetch kiosk orders when we need them
+        const { data, error } = await kioskOrdersQuery;
+        kioskOrdersData = data;
+        kioskOrdersError = error;
+      }
+
+      // Combine and normalize the data
+      const allOrders = [
+        ...(regularOrdersData || []).map(order => ({
+          ...order,
+          order_source: order.order_source || 'online',
+          order_items: order.order_items || []
+        })),
+        ...(kioskOrdersData || []).map(order => ({
+          ...order,
+          order_source: 'kiosk',
+          order_items: order.kiosk_order_items || [],
+          order_cancellations: [] // Kiosk orders don't have cancellations yet
+        }))
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      const error = ordersError || kioskOrdersError;
 
       if (error) {
         console.error('Error fetching orders:', error);
         setOrders([]);
       } else {
-        setOrders(ordersData || []);
+        console.log('🛒 Admin Orders: Fetched orders data', {
+          regularOrders: regularOrdersData?.length || 0,
+          kioskOrders: kioskOrdersData?.length || 0,
+          totalOrders: allOrders.length,
+          sourceFilter
+        });
+        // Fetch cancellation data separately and merge
+        const cancelledOrderIds = allOrders?.filter(o => o.status === 'cancelled').map(o => o.id) || [];
+        
+        if (cancelledOrderIds.length > 0) {
+          const { data: cancellationsData, error: cancellationsError } = await supabase
+            .from('order_cancellations')
+            .select('*')
+            .in('order_id', cancelledOrderIds);
+          
+          
+          if (cancellationsError) {
+            console.error('Error fetching cancellations:', cancellationsError);
+          }
+          
+          // Merge cancellation data with orders
+          const ordersWithCancellations = allOrders?.map(order => {
+            if (order.status === 'cancelled') {
+              const cancellation = cancellationsData?.find(c => c.order_id === order.id);
+              return {
+                ...order,
+                order_cancellations: cancellation ? [cancellation] : []
+              };
+            }
+            return order;
+          });
+          
+          setOrders(ordersWithCancellations || []);
+        } else {
+          setOrders(allOrders || []);
+        }
       }
     } catch (error) {
       console.error('Error fetching orders:', error);
       setOrders([]);
     } finally {
+      // Always clear loading state and timeout
+      clearTimeout(timeoutId);
       setLoading(false);
+      console.log('📋 Admin Orders: Data fetch completed');
     }
   };
 
@@ -142,7 +305,7 @@ const AdminOrders = () => {
       const { error } = await supabase.rpc('cancel_order', {
         p_order_id: selectedOrderId,
         p_reason: cancelReason,
-        p_cancelled_by: user?.id
+        p_cancelled_by: user?.id?.toString() || 'admin'
       });
 
       if (error) throw error;
@@ -252,10 +415,7 @@ const AdminOrders = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      <AdminSidebar />
-      
-      <div className="flex-1 ml-64">
+    <div>
         <div className="bg-white shadow-sm border-b border-gray-200">
           <div className="px-6 py-4">
             <h1 className="text-2xl font-bold text-gray-900">Order Management</h1>
@@ -300,7 +460,8 @@ const AdminOrders = () => {
                 { key: 'preparing', label: 'Preparing', icon: 'ri-restaurant-line', count: orders.filter(o => o.status === 'preparing').length },
                 { key: 'ready', label: 'Ready', icon: 'ri-check-line', count: orders.filter(o => o.status === 'ready').length },
                 { key: 'out_for_delivery', label: 'Out for Delivery', icon: 'ri-truck-line', count: orders.filter(o => o.status === 'out_for_delivery').length },
-                { key: 'completed', label: 'Completed', icon: 'ri-check-double-line', count: orders.filter(o => o.status === 'completed').length }
+                { key: 'completed', label: 'Completed', icon: 'ri-check-double-line', count: orders.filter(o => o.status === 'completed').length },
+                { key: 'cancelled', label: 'Cancelled', icon: 'ri-close-circle-line', count: orders.filter(o => o.status === 'cancelled').length }
               ].map((tab) => (
                 <button
                   key={tab.key}
@@ -470,6 +631,43 @@ const AdminOrders = () => {
                           </div>
                         </div>
                       </div>
+
+                      {/* Cancellation Details - Show only for cancelled orders */}
+                      {order.status === 'cancelled' && (
+                        <div className="mt-6 bg-red-50 rounded-xl p-4 border border-red-200">
+                          <h4 className="font-bold text-red-900 mb-3 flex items-center gap-2">
+                            <i className="ri-close-circle-line text-red-500"></i>
+                            Cancellation Details
+                          </h4>
+                          {order.order_cancellations && order.order_cancellations.length > 0 ? (
+                            <div className="space-y-2 text-sm">
+                              <div className="flex items-center gap-2">
+                                <i className="ri-message-3-line text-red-400"></i>
+                                <span className="text-red-800">
+                                  <strong>Reason:</strong> {getCancellationReasonLabel(order.order_cancellations[0].reason)}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <i className="ri-time-line text-red-400"></i>
+                                <span className="text-red-700">
+                                  Cancelled on {new Date(order.order_cancellations[0].created_at).toLocaleDateString()} at {new Date(order.order_cancellations[0].created_at).toLocaleTimeString()}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <i className="ri-user-line text-red-400"></i>
+                                <span className="text-red-700">
+                                  Cancelled by: {order.order_cancellations[0].cancelled_by === order.user_id ? 'Customer' : 'Admin'}
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-sm text-red-700">
+                              <p>Order was cancelled but cancellation details are not available.</p>
+                              <p className="text-xs text-red-600 mt-1">This might be an older cancellation or a system issue.</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* Action Buttons */}
@@ -505,7 +703,6 @@ const AdminOrders = () => {
             )}
           </div>
         </div>
-      </div>
 
       {/* Cancellation Modal */}
       {showCancelModal && (

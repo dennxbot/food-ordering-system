@@ -1,19 +1,27 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { formatCurrency } from '../../../utils/currency';
 import type { KioskOrderWithItems } from '../../../lib/supabase-types';
 
 const KioskOrdersPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [orders, setOrders] = useState<KioskOrderWithItems[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     fetchOrders();
   }, []);
+
+  // Phase 1: Fresh data loading on route change
+  useEffect(() => {
+    // Refresh data when route changes (fresh page reload)
+    console.log('Kiosk Orders: Fresh data load on route change');
+    fetchOrders();
+  }, [location.pathname]);
 
   const fetchOrders = async () => {
     try {

@@ -16,14 +16,26 @@ const ProtectedRoute = ({
   redirectTo = '/login' 
 }: ProtectedRouteProps) => {
   const navigate = useNavigate();
-  const { user, isLoading, isAuthenticated, isAdmin, isKiosk } = useAuth();
+  const { user, isLoading, isAuthenticated, isAdmin, isKiosk, isInitialized } = useAuth();
 
   useEffect(() => {
-    // Wait for auth to load before checking
-    if (isLoading) return;
+    // Wait for auth to initialize before checking
+    if (isLoading || !isInitialized) {
+      console.log('🔄 ProtectedRoute: Waiting for auth initialization...', { isLoading, isInitialized });
+      return;
+    }
+
+    console.log('🔍 ProtectedRoute: Auth initialized, checking access...', { 
+      isAuthenticated, 
+      userRole: user?.role, 
+      requiredRole,
+      currentPath: window.location.pathname,
+      user: user ? `${user.role} (${user.email})` : 'null'
+    });
 
     // If not authenticated, redirect to login
     if (!isAuthenticated) {
+      console.log('❌ ProtectedRoute: Not authenticated, redirecting to login');
       navigate(redirectTo);
       return;
     }
@@ -78,10 +90,10 @@ const ProtectedRoute = ({
         return;
       }
     }
-  }, [isAuthenticated, isAdmin, isKiosk, user?.role, isLoading, navigate, requiredRole, allowedRoles, redirectTo]);
+  }, [isAuthenticated, isAdmin, isKiosk, user?.role, isLoading, isInitialized, navigate, requiredRole, allowedRoles, redirectTo]);
 
   // Show loading while checking authentication
-  if (isLoading) {
+  if (isLoading || !isInitialized) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">

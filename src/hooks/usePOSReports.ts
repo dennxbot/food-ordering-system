@@ -25,6 +25,21 @@ export const usePOSReports = () => {
   const [error, setError] = useState<string | null>(null);
 
   const getSalesReport = useCallback(async (startDate: Date, endDate: Date): Promise<SalesReport[]> => {
+    console.log('📊 POS Reports: Starting sales report fetch...', {
+      timestamp: new Date().toISOString(),
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString()
+    });
+    
+    // Add timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.warn('POS Reports fetch timeout - setting loading to false', {
+        timestamp: new Date().toISOString(),
+        duration: '20s'
+      });
+      setIsLoading(false);
+    }, 20000); // 20 second timeout
+
     if (!user) {
       setError('User not authenticated');
       throw new Error('User not authenticated');
@@ -39,6 +54,25 @@ export const usePOSReports = () => {
     setError(null);
 
     try {
+      // Test Supabase connection first
+      console.log('📊 POS Reports: Testing Supabase connection...');
+      const { data: testData, error: testError } = await supabase
+        .from('orders')
+        .select('count')
+        .limit(1);
+      
+      if (testError) {
+        console.error('❌ Supabase connection test failed:', testError);
+        throw new Error(`Supabase connection failed: ${testError.message}`);
+      }
+      console.log('✅ Supabase connection test passed');
+
+      // Set user context for RLS
+      await supabase.rpc('set_user_context', { 
+        user_id: user.id, 
+        user_role: user.role 
+      });
+
       // Add a small delay to prevent too frequent requests
       await new Promise(resolve => setTimeout(resolve, 300));
 
@@ -70,7 +104,10 @@ export const usePOSReports = () => {
       setError(err.message);
       throw err;
     } finally {
+      // Always clear loading state and timeout
+      clearTimeout(timeoutId);
       setIsLoading(false);
+      console.log('📊 POS Reports: Data fetch completed');
     }
   }, [user]);
 

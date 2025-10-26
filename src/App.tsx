@@ -1,10 +1,8 @@
 import { BrowserRouter } from 'react-router-dom'
 import { AppRoutes } from './router'
 import { Suspense, Component, type ReactNode } from 'react'
-import { useAuth } from './hooks/useAuth'
-import TopNavigation from './components/feature/TopNavigation'
-import BottomNavigation from './components/feature/BottomNavigation'
-import KioskNavigation from './components/feature/KioskNavigation'
+import AppLayout from './components/layout/AppLayout'
+import AuthDebug from './components/debug/AuthDebug'
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   constructor(props: { children: ReactNode }) {
@@ -54,8 +52,6 @@ const router = {
 };
 
 function AppContent() {
-  const { isKiosk } = useAuth();
-
   return (
     <ErrorBoundary>
       <Suspense fallback={
@@ -63,22 +59,10 @@ function AppContent() {
           <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-orange-500"></div>
         </div>
       }>
-        {isKiosk ? (
-          <>
-            <KioskNavigation />
-            <div className="pt-20">
-              <AppRoutes />
-            </div>
-          </>
-        ) : (
-          <>
-            <TopNavigation />
-            <div className="lg:pt-20">
-              <AppRoutes />
-            </div>
-            <BottomNavigation />
-          </>
-        )}
+        <AppLayout>
+          <AppRoutes />
+        </AppLayout>
+        <AuthDebug />
       </Suspense>
     </ErrorBoundary>
   );

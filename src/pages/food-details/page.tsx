@@ -152,7 +152,7 @@ export default function FoodDetails() {
           {/* Enhanced Food Image */}
           <div className="relative aspect-[4/3] lg:aspect-[16/9] overflow-hidden rounded-3xl lg:sticky lg:top-24">
             <img
-              src={item.image_url || `https://readdy.ai/api/search-image?query=delicious%20$%7Bitem.name%7D%20food%20photography%20with%20simple%20clean%20background&width=400&height=300&seq=${item.id}&orientation=landscape`}
+              src={item.image_url || `https://readdy.ai/api/search-image?query=delicious%20${encodeURIComponent(item.name)}%20food%20photography%20with%20simple%20clean%20background&width=400&height=300&seq=${item.id}&orientation=landscape`}
               alt={item.name}
               className="w-full h-full object-cover object-center"
             />

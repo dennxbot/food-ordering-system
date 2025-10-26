@@ -66,6 +66,11 @@ const AdminReports = lazyLoad(() => import('../pages/admin/reports/page'));
 const AdminSettings = lazyLoad(() => import('../pages/admin/settings/page'));
 const AdminPOS = lazyLoad(() => import('../pages/admin/pos/page'));
 const AdminPOSSales = lazyLoad(() => import('../pages/admin/pos/sales/page'));
+const AdminLayout = lazyLoad(() => import('../components/layout/AdminLayout'));
+
+// Layout components
+const CustomerLayout = lazyLoad(() => import('../components/layout/CustomerLayout'));
+const KioskLayout = lazyLoad(() => import('../components/layout/KioskLayout'));
 
 // Kiosk components
 const KioskDashboard = lazyLoad(() => import('../pages/kiosk/dashboard/page'));
@@ -78,27 +83,51 @@ const KioskAccessDenied = lazyLoad(() => import('../components/feature/KioskAcce
 const routes: RouteObject[] = [
   {
     path: '/',
-    element: <Home />,
+    element: (
+      <CustomerLayout>
+        <Home />
+      </CustomerLayout>
+    ),
   },
   {
     path: '/home',
-    element: <Home />,
+    element: (
+      <CustomerLayout>
+        <Home />
+      </CustomerLayout>
+    ),
   },
   {
     path: '/menu',
-    element: <Menu />,
+    element: (
+      <CustomerLayout>
+        <Menu />
+      </CustomerLayout>
+    ),
   },
   {
     path: '/cart',
-    element: <Cart />,
+    element: (
+      <CustomerLayout>
+        <Cart />
+      </CustomerLayout>
+    ),
   },
   {
     path: '/checkout',
-    element: <Checkout />,
+    element: (
+      <CustomerLayout>
+        <Checkout />
+      </CustomerLayout>
+    ),
   },
   {
     path: '/food/:id',
-    element: <FoodDetails />,
+    element: (
+      <CustomerLayout>
+        <FoodDetails />
+      </CustomerLayout>
+    ),
   },
   {
     path: '/login',
@@ -118,26 +147,44 @@ const routes: RouteObject[] = [
   },
   {
     path: '/orders',
-    element: <Orders />,
+    element: (
+      <CustomerLayout>
+        <Orders />
+      </CustomerLayout>
+    ),
   },
   {
     path: '/orders/:id',
-    element: <OrderDetails />,
+    element: (
+      <CustomerLayout>
+        <OrderDetails />
+      </CustomerLayout>
+    ),
   },
   {
     path: '/order-confirmation/:id',
-    element: <OrderConfirmation />,
+    element: (
+      <CustomerLayout>
+        <OrderConfirmation />
+      </CustomerLayout>
+    ),
   },
   {
     path: '/profile',
-    element: <Profile />,
+    element: (
+      <CustomerLayout>
+        <Profile />
+      </CustomerLayout>
+    ),
   },
   // Kiosk routes
   {
     path: '/kiosk',
     element: (
       <ProtectedRoute requiredRole="kiosk">
-        <KioskDashboard />
+        <KioskLayout>
+          <KioskDashboard />
+        </KioskLayout>
       </ProtectedRoute>
     ),
   },
@@ -145,7 +192,9 @@ const routes: RouteObject[] = [
     path: '/kiosk/menu',
     element: (
       <ProtectedRoute requiredRole="kiosk">
-        <KioskMenu />
+        <KioskLayout>
+          <KioskMenu />
+        </KioskLayout>
       </ProtectedRoute>
     ),
   },
@@ -153,7 +202,9 @@ const routes: RouteObject[] = [
     path: '/kiosk/cart',
     element: (
       <ProtectedRoute requiredRole="kiosk">
-        <KioskCart />
+        <KioskLayout>
+          <KioskCart />
+        </KioskLayout>
       </ProtectedRoute>
     ),
   },
@@ -161,7 +212,9 @@ const routes: RouteObject[] = [
     path: '/kiosk/orders',
     element: (
       <ProtectedRoute requiredRole="kiosk">
-        <KioskOrders />
+        <KioskLayout>
+          <KioskOrders />
+        </KioskLayout>
       </ProtectedRoute>
     ),
   },
@@ -169,7 +222,9 @@ const routes: RouteObject[] = [
     path: '/kiosk/order-success',
     element: (
       <ProtectedRoute requiredRole="kiosk">
-        <KioskOrderSuccess />
+        <KioskLayout>
+          <KioskOrderSuccess />
+        </KioskLayout>
       </ProtectedRoute>
     ),
   },
@@ -178,7 +233,9 @@ const routes: RouteObject[] = [
     path: '/admin',
     element: (
       <ProtectedRoute requiredRole="admin">
-        <AdminDashboard />
+        <AdminLayout>
+          <AdminDashboard />
+        </AdminLayout>
       </ProtectedRoute>
     ),
   },
@@ -186,7 +243,9 @@ const routes: RouteObject[] = [
     path: '/admin/menu',
     element: (
       <ProtectedRoute requiredRole="admin">
-        <AdminMenu />
+        <AdminLayout>
+          <AdminMenu />
+        </AdminLayout>
       </ProtectedRoute>
     ),
   },
@@ -194,7 +253,9 @@ const routes: RouteObject[] = [
     path: '/admin/orders',
     element: (
       <ProtectedRoute requiredRole="admin">
-        <AdminOrders />
+        <AdminLayout>
+          <AdminOrders />
+        </AdminLayout>
       </ProtectedRoute>
     ),
   },
@@ -202,7 +263,9 @@ const routes: RouteObject[] = [
     path: '/admin/customers',
     element: (
       <ProtectedRoute requiredRole="admin">
-        <AdminCustomers />
+        <AdminLayout>
+          <AdminCustomers />
+        </AdminLayout>
       </ProtectedRoute>
     ),
   },
@@ -210,7 +273,9 @@ const routes: RouteObject[] = [
     path: '/admin/categories',
     element: (
       <ProtectedRoute requiredRole="admin">
-        <AdminCategories />
+        <AdminLayout>
+          <AdminCategories />
+        </AdminLayout>
       </ProtectedRoute>
     ),
   },
@@ -218,7 +283,9 @@ const routes: RouteObject[] = [
     path: '/admin/reports',
     element: (
       <ProtectedRoute requiredRole="admin">
-        <AdminReports />
+        <AdminLayout>
+          <AdminReports />
+        </AdminLayout>
       </ProtectedRoute>
     ),
   },
@@ -226,7 +293,9 @@ const routes: RouteObject[] = [
     path: '/admin/settings',
     element: (
       <ProtectedRoute requiredRole="admin">
-        <AdminSettings />
+        <AdminLayout>
+          <AdminSettings />
+        </AdminLayout>
       </ProtectedRoute>
     ),
   },
@@ -234,7 +303,9 @@ const routes: RouteObject[] = [
     path: '/admin/pos',
     element: (
       <ProtectedRoute requiredRole="admin">
-        <AdminPOS />
+        <AdminLayout>
+          <AdminPOS />
+        </AdminLayout>
       </ProtectedRoute>
     ),
   },
@@ -242,7 +313,9 @@ const routes: RouteObject[] = [
     path: '/admin/pos/sales',
     element: (
       <ProtectedRoute requiredRole="admin">
-        <AdminPOSSales />
+        <AdminLayout>
+          <AdminPOSSales />
+        </AdminLayout>
       </ProtectedRoute>
     ),
   },

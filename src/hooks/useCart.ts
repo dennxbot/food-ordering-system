@@ -15,7 +15,7 @@ const debounce = (fn: Function, ms = 300) => {
 export const useCart = () => {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
 
   // Cache reference
   const cartCache = useRef<{ [key: string]: CartItem[] }>({});
@@ -75,17 +75,39 @@ export const useCart = () => {
     }
 
     // Use cached data first
-    if (cartCache.current[user.id]) {
-      console.log('📦 Using cached cart data');
-      setItems(cartCache.current[user.id]);
-    }
+      if (cartCache.current[user.id]) {
+        console.log('📦 Using cached cart data');
+        setItems(cartCache.current[user.id]);
+        return; // Don't proceed with database loading if we have cached data
+      }
 
     loadingRef.current = true;
     setIsLoading(true);
 
+    // Add timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.warn('Cart loading timeout - setting loading to false');
+      loadingRef.current = false;
+      setIsLoading(false);
+    }, 10000); // 10 second timeout (increased from 5s)
+
     try {
       console.log('🔍 Querying database for user:', user.id);
       
+      // Test Supabase connection first
+      console.log('🔍 useCart: Testing Supabase connection...');
+      const { data: testData, error: testError } = await supabase
+        .from('cart_items')
+        .select('count')
+        .limit(1);
+      
+      if (testError) {
+        console.error('❌ Supabase connection test failed:', testError);
+        throw new Error(`Supabase connection failed: ${testError.message}`);
+      }
+      console.log('✅ Supabase connection test passed');
+      
+      const cartStartTime = Date.now();
       const { data: cartData, error } = await supabase
         .from('cart_items')
         .select(`
@@ -110,9 +132,17 @@ export const useCart = () => {
           )
         `)
         .eq('user_id', user.id);
+      const cartEndTime = Date.now();
+      console.log(`🔍 Cart query took: ${cartEndTime - cartStartTime}ms`);
 
       if (error) {
-        throw error;
+        console.error('❌ Cart query error:', error);
+        // Don't throw error, just log it and continue with empty cart
+        setItems([]);
+        setIsLoading(false);
+        loadingRef.current = false;
+        clearTimeout(timeoutId);
+        return;
       }
 
       if (!cartData || cartData.length === 0) {
@@ -123,6 +153,42 @@ export const useCart = () => {
           if (parsedCart.length > 0) {
             console.log('🔄 Migrating localStorage cart to database:', parsedCart);
             await migrateCartToDatabase(parsedCart);
+            
+            // After migration, load the cart again
+            const { data: migratedCartData, error: migratedError } = await supabase
+              .from('cart_items')
+              .select(`
+                quantity,
+                size_id,
+                food_items (
+                  id,
+                  name,
+                  price,
+                  image_url,
+                  category_id,
+                  description,
+                  is_featured,
+                  is_available,
+                  preparation_time,
+                  has_sizes
+                ),
+                item_sizes (
+                  id,
+                  name,
+                  price
+                )
+              `)
+              .eq('user_id', user.id);
+
+            if (!migratedError && migratedCartData) {
+              const processedItems = processCartData(migratedCartData);
+              cartCache.current[user.id] = processedItems;
+              setItems(processedItems);
+            } else {
+              const emptyCart: CartItem[] = [];
+              cartCache.current[user.id] = emptyCart;
+              setItems(emptyCart);
+            }
             return;
           }
         }
@@ -141,16 +207,17 @@ export const useCart = () => {
 
     } catch (error) {
       console.error('❌ Error loading cart from database:', error);
-      loadCartFromLocalStorage();
-    } finally {
-      loadingRef.current = false;
-      setIsLoading(false);
-    }
+        loadCartFromLocalStorage();
+      } finally {
+        clearTimeout(timeoutId);
+        loadingRef.current = false;
+        setIsLoading(false);
+      }
   }, [user?.id]);
 
   // Load cart and subscribe to changes when user changes
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && !isAdmin) {
       console.log('🔍 Loading cart for new user:', user.id);
       loadCartFromDatabase();
 
@@ -238,7 +305,7 @@ export const useCart = () => {
       console.log('📱 Loading cart from localStorage (no user)');
       loadCartFromLocalStorage();
     }
-  }, [user?.id, loadCartFromDatabase]);
+  }, [user?.id, isAdmin, loadCartFromDatabase]);
 
   const loadCartFromLocalStorage = () => {
     try {
@@ -559,6 +626,12 @@ export const useCart = () => {
     // Update state immediately
     setItems([]);
     
+    // Clear cache
+    if (user?.id && cartCache.current[user.id]) {
+      delete cartCache.current[user.id];
+      console.log('🗑️ Cart cache cleared for user:', user.id);
+    }
+    
     if (user?.id) {
       try {
         const { error } = await supabase
@@ -604,28 +677,97 @@ export const useCart = () => {
     orderSource?: 'online' | 'kiosk' | 'pos';
   }) => {
     try {
+      // Debug: Log the items being processed
+      console.log('🔍 Cart items being processed:', items.map(item => ({
+        id: item.id,
+        name: item.name,
+        size_id: item.size_id,
+        size_id_type: typeof item.size_id,
+        size_id_value: item.size_id,
+        quantity: item.quantity,
+        price: item.price
+      })));
+
+      // Validate that we have items to process
+      if (!items || items.length === 0) {
+        throw new Error('No items in cart to process');
+      }
+
+      // Validate each item before processing
+      for (const item of items) {
+        if (!item.id || item.id === 'undefined' || item.id === 'null') {
+          throw new Error(`Invalid item ID for "${item.name}": ${item.id}`);
+        }
+        if (!item.quantity || item.quantity <= 0) {
+          throw new Error(`Invalid quantity for "${item.name}": ${item.quantity}`);
+        }
+        if (!item.price || item.price <= 0) {
+          throw new Error(`Invalid price for "${item.name}": ${item.price}`);
+        }
+      }
+
       // Start a Supabase transaction
+      const orderItems = items.map(item => {
+        // Validate and clean the item data
+        const foodItemId = item.id && item.id !== 'undefined' && item.id !== null ? item.id : null;
+        const sizeId = item.size_id && item.size_id !== 'undefined' && item.size_id !== null ? item.size_id : null;
+        
+        if (!foodItemId) {
+          throw new Error(`Invalid food item ID: ${item.id} for item: ${item.name}`);
+        }
+
+        const processedItem = {
+          food_item_id: foodItemId,
+          size_id: sizeId,
+          quantity: item.quantity || 1,
+          unit_price: sizeId ? (item.price + (item.size_price || 0)) : item.price
+        };
+        console.log('🔍 Processed item:', processedItem);
+        return processedItem;
+      });
+
+      // Ensure user ID is valid
+      const userId = (orderData.userId && orderData.userId !== 'undefined') ? orderData.userId : null;
+      console.log('🔍 User ID check:', { original: orderData.userId, processed: userId });
+
+      console.log('🔍 Final order data:', {
+        p_customer_name: orderData.customerName,
+        p_order_items: orderItems,
+        p_user_id: userId,
+        p_customer_email: orderData.customerEmail,
+        p_customer_phone: orderData.customerPhone,
+        p_order_type: orderData.orderType,
+        p_payment_method: orderData.paymentMethod,
+        p_customer_address: orderData.customerAddress,
+        p_notes: null,
+        p_order_source: orderData.orderSource || 'online'
+      });
+
       const { data: order, error: orderError } = await supabase
         .rpc('create_order_with_items', {
-          p_user_id: orderData.userId,
           p_customer_name: orderData.customerName,
+          p_order_items: orderItems,
+          p_user_id: userId,
           p_customer_email: orderData.customerEmail,
           p_customer_phone: orderData.customerPhone,
-          p_customer_address: orderData.customerAddress,
           p_order_type: orderData.orderType,
           p_payment_method: orderData.paymentMethod,
-          p_total_amount: getTotalPrice(),
-          p_order_source: orderData.orderSource || 'online',
-          p_order_items: items.map(item => ({
-            food_item_id: item.id,
-            size_id: item.size_id,
-            quantity: item.quantity,
-            unit_price: item.size_id ? (item.price + (item.size_price || 0)) : item.price,
-            total_price: (item.size_id ? (item.price + (item.size_price || 0)) : item.price) * item.quantity
-          }))
+        p_customer_address: orderData.customerAddress,
+        p_notes: null,
+        p_order_source: orderData.orderSource || 'online'
         });
 
-      if (orderError) throw orderError;
+      if (orderError) {
+        console.error('❌ Order creation error:', orderError);
+        throw orderError;
+      }
+
+      if (!order) {
+        console.error('❌ Order creation failed - no order ID returned:', order);
+        throw new Error('Order creation failed - no order ID returned');
+      }
+
+      console.log('✅ Order created successfully with ID:', order);
 
       // Get the complete order with items in a single query
       const { data: completeOrder, error: completeOrderError } = await supabase
@@ -638,7 +780,6 @@ export const useCart = () => {
             size_id,
             quantity,
             unit_price,
-            total_price,
             food_items (
               id,
               name,
@@ -652,7 +793,7 @@ export const useCart = () => {
             )
           )
         `)
-        .eq('id', order.id)
+        .eq('id', order)
         .single();
 
       if (completeOrderError) throw completeOrderError;
@@ -662,12 +803,12 @@ export const useCart = () => {
         clearCart(),
         // Subscribe to order status changes
         supabase
-          .channel(`order_${order.id}`)
+          .channel(`order_${order}`)
           .on('postgres_changes', {
             event: '*',
             schema: 'public',
             table: 'orders',
-            filter: `id=eq.${order.id}`
+            filter: `id=eq.${order}`
           }, () => {
             // Trigger a refresh of the order details
             supabase
@@ -680,7 +821,6 @@ export const useCart = () => {
                   size_id,
                   quantity,
                   unit_price,
-                  total_price,
                   food_items (
                     id,
                     name,
@@ -694,7 +834,7 @@ export const useCart = () => {
                   )
                 )
               `)
-              .eq('id', order.id)
+              .eq('id', order)
               .single();
           })
           .subscribe()

@@ -208,10 +208,11 @@ export default function Menu() {
                   name: item.name,
                   description: item.description || '',
                   price: item.price,
-                  image_url: item.image_url || `https://readdy.ai/api/search-image?query=delicious%20$%7Bitem.name%7D%20food%20photography%20with%20simple%20clean%20background&width=400&height=300&seq=${item.id}&orientation=landscape`,
+                  image_url: item.image_url || `https://readdy.ai/api/search-image?query=delicious%20${encodeURIComponent(item.name)}%20food%20photography%20with%20simple%20clean%20background&width=400&height=300&seq=${item.id}&orientation=landscape`,
                   category_id: item.category_id,
                   is_available: item.is_available,
                   is_featured: item.is_featured,
+                  has_sizes: item.has_sizes || false,
                   preparation_time: item.preparation_time
                 }}
                 onAddToCart={() => handleAddToCart(item)}

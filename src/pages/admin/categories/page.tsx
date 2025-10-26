@@ -4,11 +4,12 @@ import { useAuth } from '../../../hooks/useAuth';
 import { supabase } from '../../../lib/supabase';
 import Button from '../../../components/base/Button';
 import Input from '../../../components/base/Input';
-import AdminSidebar from '../../../components/feature/AdminSidebar';
 
 interface Category {
   id: string;
   name: string;
+  description?: string;
+  image_url?: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -22,8 +23,11 @@ const AdminCategories = () => {
   const [loading, setLoading] = useState(true);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [isOperationLoading, setIsOperationLoading] = useState(false);
   const [newCategory, setNewCategory] = useState({
     name: '',
+    description: '',
+    image_url: '',
     is_active: true
   });
 
@@ -39,6 +43,31 @@ const AdminCategories = () => {
 
     fetchCategories();
   }, [isAuthenticated, isAdmin, isLoading, navigate]);
+
+  // Reset operation loading state when component mounts
+  useEffect(() => {
+    // Reset all loading states when component mounts
+    setIsOperationLoading(false);
+    setIsAddingCategory(false);
+    setEditingCategory(null);
+  }, []);
+
+  // Cleanup effect to reset loading state when component unmounts
+  useEffect(() => {
+    return () => {
+      setIsOperationLoading(false);
+    };
+  }, []);
+
+  // Reset loading state when window regains focus (user returns to tab)
+  useEffect(() => {
+    const handleFocus = () => {
+      setIsOperationLoading(false);
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
 
   const fetchCategories = async () => {
     try {
@@ -71,8 +100,9 @@ const AdminCategories = () => {
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target;
+    const checked = (e.target as HTMLInputElement).checked;
     setNewCategory(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
@@ -86,10 +116,13 @@ const AdminCategories = () => {
     }
 
     try {
+      setIsOperationLoading(true);
       const { data, error } = await supabase
         .from('categories')
         .insert([{
           name: newCategory.name.trim(),
+          description: newCategory.description.trim() || null,
+          image_url: newCategory.image_url.trim() || null,
           is_active: newCategory.is_active
         }])
         .select()
@@ -98,14 +131,17 @@ const AdminCategories = () => {
       if (error) throw error;
 
       if (data) {
-        setCategories([...categories, { ...data, item_count: 0 }]);
+        // Refresh the categories list to get updated data
+        await fetchCategories();
       }
 
       setIsAddingCategory(false);
-      setNewCategory({ name: '', is_active: true });
+      setNewCategory({ name: '', description: '', image_url: '', is_active: true });
     } catch (error) {
       console.error('Error adding category:', error);
       alert('Error adding category. Please try again.');
+    } finally {
+      setIsOperationLoading(false);
     }
   };
 
@@ -113,6 +149,8 @@ const AdminCategories = () => {
     setEditingCategory(category);
     setNewCategory({
       name: category.name,
+      description: category.description || '',
+      image_url: category.image_url || '',
       is_active: category.is_active
     });
   };
@@ -124,10 +162,13 @@ const AdminCategories = () => {
     }
 
     try {
+      setIsOperationLoading(true);
       const { data, error } = await supabase
         .from('categories')
         .update({
           name: newCategory.name.trim(),
+          description: newCategory.description.trim() || null,
+          image_url: newCategory.image_url.trim() || null,
           is_active: newCategory.is_active,
           updated_at: new Date().toISOString()
         })
@@ -138,18 +179,17 @@ const AdminCategories = () => {
       if (error) throw error;
 
       if (data) {
-        setCategories(categories.map(cat => 
-          cat.id === editingCategory.id 
-            ? { ...data, item_count: cat.item_count } 
-            : cat
-        ));
+        // Refresh the categories list to get updated data
+        await fetchCategories();
       }
 
       setEditingCategory(null);
-      setNewCategory({ name: '', is_active: true });
+      setNewCategory({ name: '', description: '', image_url: '', is_active: true });
     } catch (error) {
       console.error('Error updating category:', error);
       alert('Error updating category. Please try again.');
+    } finally {
+      setIsOperationLoading(false);
     }
   };
 
@@ -164,6 +204,7 @@ const AdminCategories = () => {
     }
 
     try {
+      setIsOperationLoading(true);
       const { error } = await supabase
         .from('categories')
         .delete()
@@ -171,15 +212,19 @@ const AdminCategories = () => {
 
       if (error) throw error;
 
-      setCategories(categories.filter(cat => cat.id !== id));
+      // Refresh the categories list to get updated data
+      await fetchCategories();
     } catch (error) {
       console.error('Error deleting category:', error);
       alert('Error deleting category. Please try again.');
+    } finally {
+      setIsOperationLoading(false);
     }
   };
 
   const toggleCategoryStatus = async (id: string, currentStatus: boolean) => {
     try {
+      setIsOperationLoading(true);
       const { error } = await supabase
         .from('categories')
         .update({ 
@@ -190,12 +235,13 @@ const AdminCategories = () => {
 
       if (error) throw error;
 
-      setCategories(categories.map(cat => 
-        cat.id === id ? { ...cat, is_active: !currentStatus } : cat
-      ));
+      // Refresh the categories list to get updated data
+      await fetchCategories();
     } catch (error) {
       console.error('Error updating category status:', error);
       alert('Error updating category status. Please try again.');
+    } finally {
+      setIsOperationLoading(false);
     }
   };
 
@@ -217,10 +263,7 @@ const AdminCategories = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      <AdminSidebar />
-      
-      <div className="flex-1 ml-64">
+    <div>
         <div className="bg-white shadow-sm border-b border-gray-200">
           <div className="px-6 py-4">
             <div className="flex items-center justify-between">
@@ -252,7 +295,7 @@ const AdminCategories = () => {
                     onClick={() => {
                       setIsAddingCategory(false);
                       setEditingCategory(null);
-                      setNewCategory({ name: '', is_active: true });
+                      setNewCategory({ name: '', description: '', image_url: '', is_active: true });
                     }}
                     className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
                   >
@@ -276,6 +319,36 @@ const AdminCategories = () => {
                   </div>
 
                   <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Description
+                    </label>
+                    <textarea
+                      name="description"
+                      value={newCategory.description}
+                      onChange={handleInputChange}
+                      placeholder="Enter category description (optional)"
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-orange-400 transition-colors resize-none"
+                      rows={3}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Image URL
+                    </label>
+                    <Input
+                      name="image_url"
+                      value={newCategory.image_url}
+                      onChange={handleInputChange}
+                      placeholder="Enter image URL (optional)"
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-orange-400 transition-colors"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Leave empty to use auto-generated image
+                    </p>
+                  </div>
+
+                  <div>
                     <label className="flex items-center p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer">
                       <input
                         type="checkbox"
@@ -295,16 +368,26 @@ const AdminCategories = () => {
                 <div className="flex flex-col sm:flex-row gap-4 mt-8 pt-6 border-t border-gray-200">
                   <Button
                     onClick={editingCategory ? handleUpdateCategory : handleAddCategory}
-                    className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl"
+                    disabled={isOperationLoading}
+                    className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <i className={`${editingCategory ? 'ri-save-line' : 'ri-add-line'} mr-2`}></i>
-                    {editingCategory ? 'Update Category' : 'Add Category'}
+                    {isOperationLoading ? (
+                      <>
+                        <i className="ri-loader-4-line animate-spin mr-2"></i>
+                        {editingCategory ? 'Updating...' : 'Adding...'}
+                      </>
+                    ) : (
+                      <>
+                        <i className={`${editingCategory ? 'ri-save-line' : 'ri-add-line'} mr-2`}></i>
+                        {editingCategory ? 'Update Category' : 'Add Category'}
+                      </>
+                    )}
                   </Button>
                   <Button
                     onClick={() => {
                       setIsAddingCategory(false);
                       setEditingCategory(null);
-                      setNewCategory({ name: '', is_active: true });
+                      setNewCategory({ name: '', description: '', image_url: '', is_active: true });
                     }}
                     className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl font-semibold transition-all duration-300"
                   >
@@ -364,6 +447,11 @@ const AdminCategories = () => {
                               </span>
                             </div>
                           </div>
+                          {category.description && (
+                            <p className="text-sm text-gray-600 mt-1">
+                              {category.description}
+                            </p>
+                          )}
                           <p className="text-sm text-gray-500 mt-1">
                             Created: {new Date(category.created_at).toLocaleDateString()}
                             {category.updated_at !== category.created_at && (
@@ -378,19 +466,25 @@ const AdminCategories = () => {
                       <div className="flex items-center space-x-2">
                         <button
                           onClick={() => toggleCategoryStatus(category.id, category.is_active)}
-                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          disabled={isOperationLoading}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                             category.is_active
                               ? 'bg-red-100 text-red-700 hover:bg-red-200'
                               : 'bg-green-100 text-green-700 hover:bg-green-200'
                           }`}
                         >
-                          <i className={`${category.is_active ? 'ri-eye-off-line' : 'ri-eye-line'} mr-1`}></i>
-                          {category.is_active ? 'Deactivate' : 'Activate'}
+                          {isOperationLoading ? (
+                            <i className="ri-loader-4-line animate-spin mr-1"></i>
+                          ) : (
+                            <i className={`${category.is_active ? 'ri-eye-off-line' : 'ri-eye-line'} mr-1`}></i>
+                          )}
+                          {isOperationLoading ? 'Updating...' : (category.is_active ? 'Deactivate' : 'Activate')}
                         </button>
                         
                         <button
                           onClick={() => handleEditCategory(category)}
-                          className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                          disabled={isOperationLoading}
+                          className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           title="Edit category"
                         >
                           <i className="ri-edit-line text-lg"></i>
@@ -398,7 +492,8 @@ const AdminCategories = () => {
                         
                         <button
                           onClick={() => handleDeleteCategory(category.id, category.item_count)}
-                          className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                          disabled={isOperationLoading}
+                          className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           title="Delete category"
                         >
                           <i className="ri-delete-bin-line text-lg"></i>
@@ -411,7 +506,6 @@ const AdminCategories = () => {
             )}
           </div>
         </div>
-      </div>
     </div>
   );
 };

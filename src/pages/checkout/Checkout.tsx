@@ -63,6 +63,17 @@ export default function Checkout() {
         userId: user.id,
       });
 
+      // Validate user data before creating order
+      if (!user || !user.id) {
+        throw new Error('User not authenticated or user ID is missing');
+      }
+
+      console.log('🔍 User data for order creation:', {
+        userId: user.id,
+        userEmail: user.email,
+        userRole: user.role
+      });
+
       const order = await createOrder({
         customerName: formData.fullName,
         customerEmail: user.email || '',
