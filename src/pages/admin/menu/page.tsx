@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrency } from '../../../utils/currency';
 import { useAuth } from '../../../hooks/useAuth';
@@ -37,6 +37,7 @@ const AdminMenu = () => {
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [operationLoading, setOperationLoading] = useState<string | null>(null);
   const [newItem, setNewItem] = useState({
     name: '',
     description: '',
@@ -48,6 +49,8 @@ const AdminMenu = () => {
     has_sizes: false
   });
   const [managingSizesForItem, setManagingSizesForItem] = useState<string | null>(null);
+  const timeoutRefs = useRef<Set<NodeJS.Timeout>>(new Set());
+  const lastActivityRef = useRef<number>(Date.now());
 
   useEffect(() => {
     // Wait for auth to load before checking
@@ -62,43 +65,121 @@ const AdminMenu = () => {
     fetchMenuData();
   }, [isAuthenticated, isAdmin, isLoading, navigate]);
 
+  // Track user activity and cleanup timeouts
+  useEffect(() => {
+    const updateActivity = () => {
+      lastActivityRef.current = Date.now();
+    };
+
+    // Add event listeners for user activity
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    events.forEach(event => {
+      document.addEventListener(event, updateActivity, true);
+    });
+
+    // Cleanup function
+    return () => {
+      events.forEach(event => {
+        document.removeEventListener(event, updateActivity, true);
+      });
+      
+      // Clear all timeouts
+      timeoutRefs.current.forEach(timeout => clearTimeout(timeout));
+      timeoutRefs.current.clear();
+    };
+  }, []);
+
+  // Connection recovery function
+  const checkConnectionAndRecover = async () => {
+    try {
+      console.log('🔌 Admin Menu: Checking connection...');
+      const { data, error } = await supabase.from('users').select('count').limit(1);
+      
+      if (error) {
+        console.warn('🔌 Admin Menu: Connection lost, attempting recovery...');
+        // Try to refresh session
+        await supabase.auth.refreshSession();
+        console.log('✅ Admin Menu: Connection recovered');
+        return true;
+      }
+      return true;
+    } catch (error) {
+      console.error('🔌 Admin Menu: Connection recovery failed:', error);
+      return false;
+    }
+  };
+
   const fetchMenuData = async () => {
     try {
       setLoading(true);
+      console.log('🍽️ Admin Menu: Fetching menu data...');
 
-      // Fetch categories
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from('categories')
-        .select('*')
-        .eq('is_active', true)
-        .order('name');
+      // Add timeout for the entire operation
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Menu data fetch timeout')), 15000)
+      );
 
-      if (categoriesError) {
-        console.error('Error fetching categories:', categoriesError);
-        setCategories([]);
-      } else {
-        setCategories(categoriesData || []);
-      }
+      const fetchPromise = async () => {
+        // Fetch categories with timeout
+        const categoriesPromise = supabase
+          .from('categories')
+          .select('*')
+          .eq('is_active', true)
+          .order('name');
 
-      // Fetch menu items with categories
-      const { data: menuData, error: menuError } = await supabase
-        .from('food_items')
-        .select(`
-          *,
-          category:categories(name)
-        `)
-        .order('name');
+        const categoriesTimeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Categories query timeout')), 10000)
+        );
 
-      if (menuError) {
-        console.error('Error fetching menu items:', menuError);
-        setMenuItems([]);
-      } else {
-        setMenuItems(menuData || []);
-      }
+        const { data: categoriesData, error: categoriesError } = await Promise.race([
+          categoriesPromise,
+          categoriesTimeoutPromise
+        ]) as any;
+
+        if (categoriesError) {
+          console.error('Error fetching categories:', categoriesError);
+          setCategories([]);
+        } else {
+          setCategories(categoriesData || []);
+        }
+
+        // Fetch menu items with categories and timeout
+        const menuItemsPromise = supabase
+          .from('food_items')
+          .select(`
+            *,
+            category:categories(name)
+          `)
+          .order('name');
+
+        const menuItemsTimeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Menu items query timeout')), 10000)
+        );
+
+        const { data: menuData, error: menuError } = await Promise.race([
+          menuItemsPromise,
+          menuItemsTimeoutPromise
+        ]) as any;
+
+        if (menuError) {
+          console.error('Error fetching menu items:', menuError);
+          setMenuItems([]);
+        } else {
+          setMenuItems(menuData || []);
+        }
+      };
+
+      await Promise.race([fetchPromise(), timeoutPromise]);
+      console.log('✅ Admin Menu: Menu data fetched successfully');
     } catch (error) {
       console.error('Error fetching menu data:', error);
       setCategories([]);
       setMenuItems([]);
+      
+      // Show user-friendly error message
+      if (error instanceof Error && error.message.includes('timeout')) {
+        alert('Menu data loading timed out. Please check your connection and try refreshing the page.');
+      }
     } finally {
       setLoading(false);
     }
@@ -119,26 +200,39 @@ const AdminMenu = () => {
     }
 
     try {
-      const imageUrl = newItem.image_url || `https://readdy.ai/api/search-image?query=delicious%20${encodeURIComponent(newItem.name)}%20food%20photography%20with%20simple%20clean%20background%2C%20professional%20food%20styling%2C%20appetizing%20presentation&width=400&height=300&seq=${Date.now()}&orientation=landscape`;
+      setOperationLoading('add');
+      console.log('🍽️ Admin Menu: Adding new menu item...');
 
-      const { data, error } = await supabase
-        .from('food_items')
-        .insert([{
-          name: newItem.name,
-          description: newItem.description,
-          price: parseFloat(newItem.price),
-          category_id: newItem.category_id,
-          image_url: imageUrl,
-          is_available: newItem.is_available,
-          is_featured: newItem.is_featured || false,
-          has_sizes: newItem.has_sizes
-        }])
-        .select(`
-          *,
-          category:categories(name)
-        `);
+      // Add timeout for the operation
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Add item timeout')), 10000)
+      );
 
-      if (error) throw error;
+      const addPromise = async () => {
+        const imageUrl = newItem.image_url || `https://readdy.ai/api/search-image?query=delicious%20${encodeURIComponent(newItem.name)}%20food%20photography%20with%20simple%20clean%20background%2C%20professional%20food%20styling%2C%20appetizing%20presentation&width=400&height=300&seq=${Date.now()}&orientation=landscape`;
+
+        const { data, error } = await supabase
+          .from('food_items')
+          .insert([{
+            name: newItem.name,
+            description: newItem.description,
+            price: parseFloat(newItem.price),
+            category_id: newItem.category_id,
+            image_url: imageUrl,
+            is_available: newItem.is_available,
+            is_featured: newItem.is_featured || false,
+            has_sizes: newItem.has_sizes
+          }])
+          .select(`
+            *,
+            category:categories(name)
+          `);
+
+        if (error) throw error;
+        return data;
+      };
+
+      const data = await Promise.race([addPromise(), timeoutPromise]) as any;
 
       if (data) {
         setMenuItems([...menuItems, ...data]);
@@ -155,9 +249,17 @@ const AdminMenu = () => {
         has_sizes: false
       });
       setIsAddingItem(false);
+      alert('Menu item added successfully!');
+      console.log('✅ Admin Menu: Menu item added successfully');
     } catch (error) {
       console.error('Error adding menu item:', error);
-      alert('Error adding menu item. Please try again.');
+      if (error instanceof Error && error.message.includes('timeout')) {
+        alert('Adding menu item timed out. Please check your connection and try again.');
+      } else {
+        alert('Error adding menu item. Please try again.');
+      }
+    } finally {
+      setOperationLoading(null);
     }
   };
 
@@ -287,7 +389,22 @@ const AdminMenu = () => {
 
   const toggleAvailability = async (id: string, currentAvailability: boolean) => {
     try {
-      const { error } = await supabase
+      setOperationLoading(`toggle-${id}`);
+      console.log('🍽️ Admin Menu: Toggling availability for item:', id);
+
+      // Check connection first
+      const isConnected = await checkConnectionAndRecover();
+      if (!isConnected) {
+        alert('Connection lost. Please refresh the page and try again.');
+        return;
+      }
+
+      // Add timeout for the operation
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Toggle availability timeout')), 8000)
+      );
+
+      const updatePromise = supabase
         .from('food_items')
         .update({ 
           is_available: !currentAvailability,
@@ -295,21 +412,38 @@ const AdminMenu = () => {
         })
         .eq('id', id);
 
+      const { error } = await Promise.race([updatePromise, timeoutPromise]) as any;
+
       if (error) throw error;
 
       setMenuItems(menuItems.map(item => 
         item.id === id ? { ...item, is_available: !currentAvailability } : item
       ));
+      console.log('✅ Admin Menu: Availability toggled successfully');
     } catch (error) {
       console.error('Error updating availability:', error);
-      alert('Error updating availability. Please try again.');
+      if (error instanceof Error && error.message.includes('timeout')) {
+        alert('Updating availability timed out. Please check your connection and try again.');
+      } else {
+        alert('Error updating availability. Please try again.');
+      }
+    } finally {
+      setOperationLoading(null);
     }
   };
 
   const toggleFeatured = async (id: string, currentFeatured: boolean | undefined) => {
     const newFeaturedState = !currentFeatured;
     try {
-      const { error } = await supabase
+      setOperationLoading(`featured-${id}`);
+      console.log('🍽️ Admin Menu: Toggling featured status for item:', id);
+
+      // Add timeout for the operation
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Toggle featured timeout')), 8000)
+      );
+
+      const updatePromise = supabase
         .from('food_items')
         .update({ 
           is_featured: newFeaturedState,
@@ -317,14 +451,23 @@ const AdminMenu = () => {
         })
         .eq('id', id);
 
+      const { error } = await Promise.race([updatePromise, timeoutPromise]) as any;
+
       if (error) throw error;
 
       setMenuItems(menuItems.map(item => 
         item.id === id ? { ...item, is_featured: newFeaturedState } : item
       ));
+      console.log('✅ Admin Menu: Featured status toggled successfully');
     } catch (error) {
       console.error('Error updating featured status:', error);
-      alert('Error updating featured status. Please try again.');
+      if (error instanceof Error && error.message.includes('timeout')) {
+        alert('Updating featured status timed out. Please check your connection and try again.');
+      } else {
+        alert('Error updating featured status. Please try again.');
+      }
+    } finally {
+      setOperationLoading(null);
     }
   };
 
@@ -581,13 +724,23 @@ const AdminMenu = () => {
                   <div className="absolute top-2 right-2 flex space-x-2">
                     <button
                       onClick={() => toggleAvailability(item.id, item.is_available)}
+                      disabled={operationLoading === `toggle-${item.id}`}
                       className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        item.is_available
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
+                        operationLoading === `toggle-${item.id}`
+                          ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                          : item.is_available
+                          ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                          : 'bg-red-100 text-red-800 hover:bg-red-200'
                       }`}
                     >
-                      {item.is_available ? 'Available' : 'Unavailable'}
+                      {operationLoading === `toggle-${item.id}` ? (
+                        <span className="flex items-center">
+                          <div className="animate-spin rounded-full h-3 w-3 border-b border-gray-500 mr-1"></div>
+                          Updating...
+                        </span>
+                      ) : (
+                        item.is_available ? 'Available' : 'Unavailable'
+                      )}
                     </button>
                     {item.is_featured && (
                       <div className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
@@ -628,14 +781,26 @@ const AdminMenu = () => {
                       
                       <button
                         onClick={() => setManagingSizesForItem(item.id)}
+                        disabled={operationLoading === `sizes-${item.id}`}
                         className={`flex items-center px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                          item.has_sizes
+                          operationLoading === `sizes-${item.id}`
+                            ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                            : item.has_sizes
                             ? 'bg-purple-100 text-purple-800 hover:bg-purple-200'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }`}
                       >
-                        <i className="ri-price-tag-3-line mr-1"></i>
-                        {item.has_sizes ? 'Manage Sizes' : 'Add Sizes'}
+                        {operationLoading === `sizes-${item.id}` ? (
+                          <span className="flex items-center">
+                            <div className="animate-spin rounded-full h-3 w-3 border-b border-gray-500 mr-1"></div>
+                            Loading...
+                          </span>
+                        ) : (
+                          <>
+                            <i className="ri-price-tag-3-line mr-1"></i>
+                            {item.has_sizes ? 'Manage Sizes' : 'Add Sizes'}
+                          </>
+                        )}
                       </button>
                     </div>
                     
