@@ -264,6 +264,7 @@ const AdminMenu = () => {
   };
 
   const handleEditItem = (item: MenuItem) => {
+    console.log('🍽️ Admin Menu: Edit button clicked for item:', item);
     setEditingItem(item);
     setNewItem({
       name: item.name,
@@ -275,6 +276,7 @@ const AdminMenu = () => {
       is_featured: item.is_featured || false,
       has_sizes: item.has_sizes
     });
+    console.log('✅ Admin Menu: Edit item state set');
   };
 
   const handleUpdateItem = async () => {
@@ -388,6 +390,7 @@ const AdminMenu = () => {
   };
 
   const toggleAvailability = async (id: string, currentAvailability: boolean) => {
+    console.log('🍽️ Admin Menu: Toggle availability button clicked for item:', id, 'current:', currentAvailability);
     try {
       setOperationLoading(`toggle-${id}`);
       console.log('🍽️ Admin Menu: Toggling availability for item:', id);
@@ -723,7 +726,10 @@ const AdminMenu = () => {
                   />
                   <div className="absolute top-2 right-2 flex space-x-2">
                     <button
-                      onClick={() => toggleAvailability(item.id, item.is_available)}
+                      onClick={() => {
+                        console.log('🍽️ Admin Menu: Toggle availability button clicked!');
+                        toggleAvailability(item.id, item.is_available);
+                      }}
                       disabled={operationLoading === `toggle-${item.id}`}
                       className={`px-2 py-1 rounded-full text-xs font-medium ${
                         operationLoading === `toggle-${item.id}`
@@ -732,6 +738,7 @@ const AdminMenu = () => {
                           ? 'bg-green-100 text-green-800 hover:bg-green-200'
                           : 'bg-red-100 text-red-800 hover:bg-red-200'
                       }`}
+                      style={{ pointerEvents: 'auto', zIndex: 10 }}
                     >
                       {operationLoading === `toggle-${item.id}` ? (
                         <span className="flex items-center">
@@ -780,7 +787,10 @@ const AdminMenu = () => {
                       </button>
                       
                       <button
-                        onClick={() => setManagingSizesForItem(item.id)}
+                        onClick={() => {
+                          console.log('🍽️ Admin Menu: Add Sizes button clicked for item:', item.id);
+                          setManagingSizesForItem(item.id);
+                        }}
                         disabled={operationLoading === `sizes-${item.id}`}
                         className={`flex items-center px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                           operationLoading === `sizes-${item.id}`
@@ -806,14 +816,22 @@ const AdminMenu = () => {
                     
                     <div className="flex space-x-2">
                       <button
-                        onClick={() => handleEditItem(item)}
-                        className="text-blue-600 hover:text-blue-700"
+                        onClick={() => {
+                          console.log('🍽️ Admin Menu: Edit button clicked!');
+                          handleEditItem(item);
+                        }}
+                        className="text-blue-600 hover:text-blue-700 p-2 border border-blue-200 rounded hover:bg-blue-50"
+                        style={{ pointerEvents: 'auto', zIndex: 10 }}
                       >
                         <i className="ri-edit-line"></i>
                       </button>
                       <button
-                        onClick={() => handleDeleteItem(item.id)}
-                        className="text-red-600 hover:text-red-700"
+                        onClick={() => {
+                          console.log('🍽️ Admin Menu: Delete button clicked!');
+                          handleDeleteItem(item.id);
+                        }}
+                        className="text-red-600 hover:text-red-700 p-2 border border-red-200 rounded hover:bg-red-50"
+                        style={{ pointerEvents: 'auto', zIndex: 10 }}
                       >
                         <i className="ri-delete-bin-line"></i>
                       </button>
