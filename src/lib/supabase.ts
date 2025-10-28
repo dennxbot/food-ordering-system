@@ -10,7 +10,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
-    autoRefreshToken: true,
+    autoRefreshToken: false, // Disable automatic token refresh to prevent rate limiting
     detectSessionInUrl: true
   },
   realtime: {
@@ -44,14 +44,15 @@ export const startConnectionMonitoring = () => {
         const now = Date.now();
         const timeSinceLastAttempt = now - lastConnectionAttempt;
         
-        if (timeSinceLastAttempt > 60000 && connectionFailureCount < 5) { // 1 minute cooldown, max 5 attempts
+        // Increased cooldown to 5 minutes and reduced max attempts to 3 to prevent rate limiting
+        if (timeSinceLastAttempt > 300000 && connectionFailureCount < 3) { // 5 minute cooldown, max 3 attempts
           lastConnectionAttempt = now;
           try {
             await supabase.auth.refreshSession();
           } catch (refreshError) {
             console.warn('🔌 Token refresh failed:', refreshError);
           }
-        } else if (connectionFailureCount >= 5) {
+        } else if (connectionFailureCount >= 3) {
           console.warn('🔌 Too many connection failures, stopping reconnection attempts');
           stopConnectionMonitoring();
         }
@@ -74,10 +75,10 @@ export const startConnectionMonitoring = () => {
         setTimeout(() => {
           console.log('🔄 Restarting connection monitoring...');
           startConnectionMonitoring();
-        }, 120000); // 2 minutes
+        }, 300000); // 5 minutes
       }
     }
-  }, 30000); // Check every 30 seconds
+  }, 120000); // Check every 2 minutes instead of 30 seconds
 };
 
 export const stopConnectionMonitoring = () => {

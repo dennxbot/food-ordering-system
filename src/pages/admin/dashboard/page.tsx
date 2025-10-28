@@ -235,20 +235,6 @@ const AdminDashboard = () => {
 
   const quickActions = [
     {
-      title: 'Point of Sale',
-      description: 'Process dine-in and walk-in orders',
-      icon: 'ri-cash-line',
-      path: '/admin/pos',
-      color: 'bg-green-500'
-    },
-    {
-      title: 'POS Sales Report',
-      description: 'View POS sales analytics',
-      icon: 'ri-line-chart-line',
-      path: '/admin/pos/sales',
-      color: 'bg-indigo-500'
-    },
-    {
       title: 'Manage Orders',
       description: 'View and update order status',
       icon: 'ri-shopping-bag-line',

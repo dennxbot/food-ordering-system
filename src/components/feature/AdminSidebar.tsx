@@ -15,18 +15,6 @@ const AdminSidebar = () => {
       active: location.pathname === '/admin'
     },
     {
-      icon: 'ri-cash-line',
-      label: 'POS',
-      path: '/admin/pos',
-      active: location.pathname === '/admin/pos'
-    },
-    {
-      icon: 'ri-line-chart-line',
-      label: 'POS Sales',
-      path: '/admin/pos/sales',
-      active: location.pathname === '/admin/pos/sales'
-    },
-    {
       icon: 'ri-shopping-bag-line',
       label: 'Orders',
       path: '/admin/orders',

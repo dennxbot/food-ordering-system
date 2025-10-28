@@ -64,8 +64,6 @@ const AdminCustomers = lazyLoad(() => import('../pages/admin/customers/page'));
 const AdminCategories = lazyLoad(() => import('../pages/admin/categories/page'));
 const AdminReports = lazyLoad(() => import('../pages/admin/reports/page'));
 const AdminSettings = lazyLoad(() => import('../pages/admin/settings/page'));
-const AdminPOS = lazyLoad(() => import('../pages/admin/pos/page'));
-const AdminPOSSales = lazyLoad(() => import('../pages/admin/pos/sales/page'));
 const AdminLayout = lazyLoad(() => import('../components/layout/AdminLayout'));
 
 // Layout components
@@ -299,26 +297,7 @@ const routes: RouteObject[] = [
       </ProtectedRoute>
     ),
   },
-  {
-    path: '/admin/pos',
-    element: (
-      <ProtectedRoute requiredRole="admin">
-        <AdminLayout>
-          <AdminPOS />
-        </AdminLayout>
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/admin/pos/sales',
-    element: (
-      <ProtectedRoute requiredRole="admin">
-        <AdminLayout>
-          <AdminPOSSales />
-        </AdminLayout>
-      </ProtectedRoute>
-    ),
-  },
+
   {
     path: '*',
     element: <NotFound />,
